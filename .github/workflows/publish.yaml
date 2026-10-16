@@ -1,0 +1,117 @@
+name: Release @authara/react-native
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release state
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Check Core release provenance
+        id: provenance
+        run: |
+          core_version="$(jq -r '.core.version' .codegen/manifest.json)"
+          test -n "$core_version"
+          test "$core_version" != null
+          if test "$core_version" = unreleased; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update React Native SDK release PR
+        id: release
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          token: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Enable release PR auto-merge
+        if: steps.provenance.outputs.released == 'true' && vars.NPM_TRUSTED_PUBLISHING_READY == 'true' && steps.release.outputs.release_created != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
+        run: |
+          pr_number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --state open \
+            --json number,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("release-please--branches--main"))][0].number')"
+          if test -z "$pr_number"; then
+            echo "No open Release Please PR found."
+            exit 0
+          fi
+          gh pr update-branch --repo "$GITHUB_REPOSITORY" "$pr_number"
+          gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$pr_number"
+
+      - name: Hold release until npm bootstrap is complete
+        if: steps.provenance.outputs.released == 'true' && vars.NPM_TRUSTED_PUBLISHING_READY != 'true' && steps.release.outputs.release_created != 'true'
+        run: echo "Release PR is ready but auto-merge is disabled until NPM_TRUSTED_PUBLISHING_READY=true."
+
+      - name: Reject release without npm Trusted Publisher
+        if: steps.release.outputs.release_created == 'true'
+        run: test "${{ vars.NPM_TRUSTED_PUBLISHING_READY }}" = true
+
+      - name: Checkout released source
+        if: steps.release.outputs.release_created == 'true'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ steps.release.outputs.sha }}
+
+      - name: Setup Node
+        if: steps.release.outputs.release_created == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Reject unpinned Core provenance
+        if: steps.release.outputs.release_created == 'true'
+        run: |
+          test "$(node -p 'require("./.codegen/manifest.json").core.version')" != "unreleased"
+          test "$(node -p 'require("./.codegen/manifest.json").core.commit')" != "local-working-tree"
+          test "$(node -p 'require("./.codegen/manifest.json").generatorCommit')" != "local-working-tree"
+
+      - name: Install dependencies
+        if: steps.release.outputs.release_created == 'true'
+        run: npm ci
+
+      - name: Verify tag matches package version
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          expected_tag="v$(node -p "require('./package.json').version")"
+          if test "$RELEASE_TAG" != "$expected_tag"; then
+            echo "Release tag $RELEASE_TAG does not match package version $expected_tag." >&2
+            exit 1
+          fi
+
+      - name: Run tests
+        if: steps.release.outputs.release_created == 'true'
+        run: npm test
+
+      - name: Build
+        if: steps.release.outputs.release_created == 'true'
+        run: npm run build
+
+      - name: Publish to npm with Trusted Publisher
+        if: steps.release.outputs.release_created == 'true'
+        run: npm publish --provenance --access public

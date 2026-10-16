@@ -1,0 +1,165 @@
+name: Sync released Core API
+
+on:
+  repository_dispatch:
+    types: [authara-core-released]
+  workflow_dispatch:
+    inputs:
+      core_tag:
+        description: Released authara-core tag
+        required: true
+        type: string
+      core_sha:
+        description: Commit referenced by the authara-core tag
+        required: true
+        type: string
+      core_bump:
+        description: Release type used for the generated update
+        required: true
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-core-api
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      CORE_TAG: ${{ github.event.client_payload.core_tag || inputs.core_tag }}
+      CORE_SHA: ${{ github.event.client_payload.core_sha || inputs.core_sha }}
+      CORE_BUMP: ${{ github.event.client_payload.core_bump || inputs.core_bump }}
+      AUTOMATION_TOKEN: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
+
+    steps:
+      - name: Validate release input
+        run: |
+          if [[ ! "$CORE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid core tag: $CORE_TAG" >&2
+            exit 1
+          fi
+          if [[ ! "$CORE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid core commit: $CORE_SHA" >&2
+            exit 1
+          fi
+          case "$CORE_BUMP" in
+            patch|minor|major) ;;
+            *) echo "Invalid core bump: $CORE_BUMP" >&2; exit 1 ;;
+          esac
+
+      - name: Checkout React Native SDK
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          token: ${{ env.AUTOMATION_TOKEN }}
+
+      - name: Checkout released Core source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          repository: authara-org/authara
+          ref: ${{ env.CORE_TAG }}
+          path: .authara-core-source
+          token: ${{ env.AUTOMATION_TOKEN }}
+
+      - name: Verify immutable Core source
+        run: |
+          actual_sha="$(git -C .authara-core-source rev-parse HEAD)"
+          if test "$actual_sha" != "$CORE_SHA"; then
+            echo "Core tag $CORE_TAG points to $actual_sha, expected $CORE_SHA." >&2
+            exit 1
+          fi
+          cp .authara-core-source/contract/openapi.yaml .codegen/openapi.yaml
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run generate
+
+      - name: Detect changes and record provenance
+        id: changes
+        run: |
+          generated_changed=false
+          if test -n "$(git status --porcelain -- src/generated)"; then
+            generated_changed=true
+          fi
+          contract_sha="$(sha256sum .codegen/openapi.yaml | cut -d ' ' -f 1)"
+          previous_sha="$(node -p 'require("./.codegen/manifest.json").core.contractSha256 || ""')"
+          previous_version="$(node -p 'require("./.codegen/manifest.json").core.version || ""')"
+          if test "$generated_changed" = false && test "$contract_sha" = "$previous_sha" && test "$previous_version" != unreleased; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node -e '
+            const fs = require("fs");
+            const manifest = {
+              core: {
+                repository: "authara-org/authara",
+                version: process.env.CORE_TAG,
+                commit: process.env.CORE_SHA,
+                contract: "contract/openapi.yaml",
+                contractSha256: process.argv[1],
+              },
+              generatorCommit: process.argv[2],
+            };
+            fs.writeFileSync(".codegen/manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+          ' "$contract_sha" "$(git rev-parse HEAD)"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "generated=$generated_changed" >> "$GITHUB_OUTPUT"
+
+      - run: npm run check:generated
+        if: steps.changes.outputs.changed == 'true'
+      - run: npm test
+        if: steps.changes.outputs.changed == 'true'
+      - run: npm run build
+        if: steps.changes.outputs.changed == 'true'
+
+      - name: Create SDK update pull request
+        if: steps.changes.outputs.changed == 'true'
+        id: pull-request
+        env:
+          GH_TOKEN: ${{ env.AUTOMATION_TOKEN }}
+        run: |
+          branch="automation/authara-core-${CORE_TAG}"
+          if test "${{ steps.changes.outputs.generated }}" = true; then
+            case "$CORE_BUMP" in
+              major) title="feat(api)!: generate client from authara-core ${CORE_TAG}" ;;
+              minor) title="feat(api): generate client from authara-core ${CORE_TAG}" ;;
+              patch) title="fix(api): generate client from authara-core ${CORE_TAG}" ;;
+            esac
+          else
+            title="chore(codegen): record authara-core ${CORE_TAG} provenance"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            git fetch origin "$branch:refs/remotes/origin/$branch"
+          fi
+          git checkout -B "$branch"
+          git add .codegen/manifest.json .codegen/openapi.yaml src/generated
+          git commit -m "$title"
+          git push --force-with-lease origin "$branch"
+          pr_number="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number')"
+          if test -z "$pr_number"; then
+            pr_url="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --title "$title" --body "Generated from immutable authara-core release ${CORE_TAG} (${CORE_SHA}).")"
+            pr_number="${pr_url##*/}"
+          fi
+          echo "number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge
+        if: steps.pull-request.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ env.AUTOMATION_TOKEN }}
+        run: >-
+          gh pr merge
+          --repo "$GITHUB_REPOSITORY"
+          --auto
+          --squash
+          "${{ steps.pull-request.outputs.number }}"

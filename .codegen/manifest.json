@@ -1,0 +1,10 @@
+{
+  "core": {
+    "repository": "authara-org/authara",
+    "version": "unreleased",
+    "commit": "local-working-tree",
+    "contract": "contract/openapi.yaml",
+    "contractSha256": "8049bf66cf4332d51c5e24467b050f1fa4042b0023f56d93de2ba039ef3f3d03"
+  },
+  "generatorCommit": "local-working-tree"
+}

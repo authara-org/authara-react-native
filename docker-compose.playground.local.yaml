@@ -1,0 +1,13 @@
+services:
+  migrations:
+    image: authara-react-native-migrations:local
+    build:
+      context: ${AUTHARA_EXAMPLE_CORE_DIR:?Set AUTHARA_EXAMPLE_CORE_DIR to the Authara Core checkout}/migrations
+
+  authara:
+    image: authara-react-native-core:local
+    build:
+      context: ${AUTHARA_EXAMPLE_CORE_DIR:?Set AUTHARA_EXAMPLE_CORE_DIR to the Authara Core checkout}
+      dockerfile: docker/Dockerfile.prod
+      args:
+        VERSION: local-react-native

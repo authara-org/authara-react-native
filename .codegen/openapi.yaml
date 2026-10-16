@@ -1,0 +1,4114 @@
+openapi: 3.0.3
+
+info:
+  title: Authara HTTP API
+  version: 0.1.0
+  description: |
+    Public browser-facing and internal server-to-server JSON APIs exposed by Authara.
+    HTML routes and deployment behavior are intentionally outside this description.
+
+servers:
+  - url: /
+
+tags:
+  - name: Authentication
+  - name: Passkeys
+  - name: Sessions
+  - name: Users
+  - name: Organizations
+  - name: Internal
+
+paths:
+  /auth/api/v1/csrf:
+    get:
+      operationId: getCsrfToken
+      tags: [Authentication]
+      summary: Get a CSRF token
+      description: Issues a CSRF token cookie and returns the token value for browser API calls.
+      security: []
+      x-authara-access: public
+      x-authara-set-cookies: [authara_csrf]
+      x-authara-error-codes:
+        "500": [internal_error]
+      responses:
+        "200":
+          description: CSRF token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CSRFToken"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/oauth/google/options:
+    get:
+      operationId: getGoogleLoginOptions
+      tags: [Authentication]
+      summary: Get Google login options
+      description: Returns the Google client ID and nonce needed to start the Google sign-in flow.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/SessionTransport"
+      x-authara-access: public
+      x-authara-availability: google-enabled
+      x-authara-set-cookies: [authara_oauth_nonce]
+      x-authara-error-codes:
+        "404": [not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Google login options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleLoginOptions"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/oauth/google:
+    post:
+      operationId: loginWithGoogle
+      tags: [Authentication]
+      summary: Log in with Google
+      description: Exchanges either a Google authorization code or a legacy verified Google ID token for Authara session cookies and JSON tokens. Account collisions return a pending recovery link in the error response.
+      parameters:
+        - $ref: "#/components/parameters/Audience"
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: google-enabled
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "409": [account_link_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleLoginRequest"
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/oauth/apple/options:
+    get:
+      operationId: getAppleLoginOptions
+      tags: [Authentication]
+      summary: Get Apple login options
+      description: Returns the Apple Services ID, redirect URI, state, and nonce needed to start Sign in with Apple.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/SessionTransport"
+      x-authara-access: public
+      x-authara-availability: apple-enabled
+      x-authara-set-cookies: [authara_apple_oauth]
+      x-authara-error-codes:
+        "404": [not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Apple login options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppleLoginOptions"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/oauth/apple:
+    post:
+      operationId: loginWithApple
+      tags: [Authentication]
+      summary: Log in with an Apple authorization code
+      description: Exchanges a one-time Apple authorization code for Authara session cookies and JSON tokens. Account collisions return a pending recovery link in the error response.
+      parameters:
+        - $ref: "#/components/parameters/Audience"
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+          appleOAuthCookie: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: apple-enabled
+      x-authara-set-cookies: [authara_apple_oauth, authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "409": [account_link_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppleAuthorizationRequest"
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/oauth/microsoft/options:
+    get:
+      operationId: getMicrosoftLoginOptions
+      tags: [Authentication]
+      summary: Get Microsoft login options
+      description: Returns the Microsoft client ID, authority, and nonce needed to start the Microsoft popup flow.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/SessionTransport"
+      x-authara-access: public
+      x-authara-availability: microsoft-enabled
+      x-authara-set-cookies: [authara_oauth_nonce]
+      x-authara-error-codes:
+        "404": [not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Microsoft login options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MicrosoftLoginOptions"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/oauth/microsoft:
+    post:
+      operationId: loginWithMicrosoft
+      tags: [Authentication]
+      summary: Log in with Microsoft
+      description: Exchanges a nonce-bound Microsoft ID token for Authara session cookies and JSON tokens. Account collisions return a pending recovery link in the error response.
+      parameters:
+        - $ref: "#/components/parameters/Audience"
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: microsoft-enabled
+      x-authara-clear-cookies: [authara_oauth_nonce]
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "409": [account_link_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MicrosoftLoginRequest"
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/invitations/preview:
+    get:
+      operationId: previewInvitation
+      tags: [Organizations]
+      summary: Preview an organization invitation
+      description: Returns the invitation, organization, and current invitation status for a valid bearer token.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      security: []
+      x-authara-access: public
+      x-authara-availability: invitations-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "403": [forbidden]
+        "404": [not_found, invitation_not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Invitation preview, including invitations that are no longer pending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitationPreview"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/invitations/accept:
+    post:
+      operationId: acceptInvitation
+      tags: [Organizations]
+      summary: Accept an invitation and switch the current session to its organization
+      description: Accepts the invitation for the authenticated user and rotates the current session into the invited organization.
+      parameters:
+        - $ref: "#/components/parameters/AppAudience"
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-availability: invitations-enabled
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden, invitation_email_mismatch]
+        "404": [not_found, invitation_not_found]
+        "409": [invitation_already_accepted, invitation_revoked, invitation_expired, organization_membership_conflict]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationTokenRequest"
+      responses:
+        "200":
+          description: Session tokens scoped to the invitation organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/invitations/login:
+    post:
+      operationId: loginAndAcceptInvitation
+      tags: [Authentication]
+      summary: Log in with a password, accept an invitation, and switch organizations
+      description: Uses the invitation email and supplied password to authenticate, accept the invitation, and create a session in the invited organization.
+      parameters:
+        - $ref: "#/components/parameters/AppAudience"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: invitations-enabled
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden, invitation_email_mismatch]
+        "404": [not_found, invitation_not_found]
+        "409": [invitation_already_accepted, invitation_revoked, invitation_expired, organization_membership_conflict]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationPasswordLoginRequest"
+      responses:
+        "200":
+          description: Authenticated session scoped to the invitation organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/invitations/google:
+    post:
+      operationId: authenticateAndAcceptInvitationWithGoogle
+      tags: [Authentication]
+      summary: Sign up or log in with Google, accept an invitation, and switch organizations
+      description: Returns a recovery link instead of a session when the Google identity must first be linked to an existing account.
+      parameters:
+        - $ref: "#/components/parameters/AppAudience"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: [invitations-enabled, google-enabled]
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden, invitation_email_mismatch]
+        "404": [not_found, invitation_not_found]
+        "409": [invitation_flow_mismatch, auth_method_already_linked, invitation_already_accepted, invitation_revoked, invitation_expired, organization_membership_conflict]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationGoogleRequest"
+      responses:
+        "200":
+          description: Authenticated session or an existing-account recovery link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitationGoogleResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/provider-links/recovery/google:
+    post:
+      operationId: startGoogleAccountRecoveryLink
+      tags: [Authentication]
+      summary: Start linking Google to an existing account with the same email
+      description: Verifies a Google identity and creates a short-lived link that can be completed by proving ownership of the existing account.
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: google-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "409": [auth_method_already_linked]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleLoginRequest"
+      responses:
+        "202":
+          description: Existing-account proof is required before Google can be linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountRecoveryLink"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/provider-links/recovery/{linkID}/password:
+    post:
+      operationId: completeAccountRecoveryLinkWithPassword
+      tags: [Authentication]
+      summary: Prove ownership with the existing account password and finish linking
+      description: Consumes a recovery link after password proof, creates a session, and optionally accepts and switches to an invitation organization.
+      parameters:
+        - $ref: "#/components/parameters/ProviderLinkID"
+        - $ref: "#/components/parameters/AppAudience"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden, invitation_email_mismatch]
+        "404": [password_provider_not_found, invitation_not_found]
+        "409": [provider_link_expired, auth_method_already_linked, invitation_already_accepted, invitation_revoked, invitation_expired, organization_membership_conflict]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountRecoveryPasswordProofRequest"
+      responses:
+        "200":
+          description: Linked provider and authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/provider-links/recovery/{linkID}/google:
+    post:
+      operationId: completeAccountRecoveryLinkWithGoogle
+      tags: [Authentication]
+      summary: Prove ownership with an existing Google login and finish linking
+      description: Consumes a recovery link after provider proof, creates a session, and optionally accepts and switches to an invitation organization.
+      parameters:
+        - $ref: "#/components/parameters/ProviderLinkID"
+        - $ref: "#/components/parameters/AppAudience"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: google-enabled
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden, invitation_email_mismatch]
+        "404": [not_found, invitation_not_found]
+        "409": [provider_link_expired, auth_method_already_linked, invitation_already_accepted, invitation_revoked, invitation_expired, organization_membership_conflict]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountRecoveryGoogleProofRequest"
+      responses:
+        "200":
+          description: Linked provider and authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/provider-links/recovery/{linkID}/apple:
+    post:
+      operationId: completeAccountRecoveryLinkWithApple
+      tags: [Authentication]
+      summary: Prove ownership with an existing Apple login and finish linking
+      description: Consumes a recovery link after Apple provider proof, creates a session, and optionally accepts and switches to an invitation organization.
+      parameters:
+        - $ref: "#/components/parameters/ProviderLinkID"
+        - $ref: "#/components/parameters/AppAudience"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+          appleOAuthCookie: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: apple-enabled
+      x-authara-set-cookies: [authara_apple_oauth, authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden, invitation_email_mismatch]
+        "404": [not_found, invitation_not_found]
+        "409": [provider_link_expired, auth_method_already_linked, invitation_already_accepted, invitation_revoked, invitation_expired, organization_membership_conflict]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountRecoveryAppleProofRequest"
+      responses:
+        "200":
+          description: Linked provider and authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/provider-links/recovery/{linkID}/microsoft:
+    post:
+      operationId: completeAccountRecoveryLinkWithMicrosoft
+      tags: [Authentication]
+      summary: Prove ownership with an existing Microsoft login and finish linking
+      description: Consumes a recovery link after Microsoft provider proof, creates a session, and optionally accepts and switches to an invitation organization.
+      parameters:
+        - $ref: "#/components/parameters/ProviderLinkID"
+        - $ref: "#/components/parameters/AppAudience"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: microsoft-enabled
+      x-authara-clear-cookies: [authara_oauth_nonce]
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden, invitation_email_mismatch]
+        "404": [not_found, invitation_not_found]
+        "409": [provider_link_expired, auth_method_already_linked, invitation_already_accepted, invitation_revoked, invitation_expired, organization_membership_conflict]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountRecoveryMicrosoftProofRequest"
+      responses:
+        "200":
+          description: Linked provider and authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/login:
+    post:
+      operationId: loginWithPassword
+      tags: [Authentication]
+      summary: Log in with a password
+      description: Authenticates a user with an email address and password and creates a new Authara session. When AUTHARA_USERNAME_LOGIN_ENABLED=true, the identifier field also accepts a username.
+      parameters:
+        - $ref: "#/components/parameters/Audience"
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordLoginRequest"
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/signup/direct:
+    post:
+      operationId: signupDirect
+      tags: [Authentication]
+      summary: Create an account without a signup challenge
+      description: Creates a user account immediately when challenge-based signup is disabled.
+      parameters:
+        - $ref: "#/components/parameters/AppAudience"
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: challenges-disabled
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "403": [forbidden]
+        "404": [not_found]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "201":
+          description: Created account and authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/signup/challenges:
+    post:
+      operationId: startSignupChallenge
+      tags: [Authentication]
+      summary: Start challenge-based signup
+      description: Starts signup by creating and delivering a verification challenge for the email address.
+      parameters:
+        - $ref: "#/components/parameters/AppAudience"
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: challenges-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "403": [forbidden]
+        "404": [not_found]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "202":
+          description: Signup challenge started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupChallenge"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/signup/challenges/verify:
+    post:
+      operationId: verifySignupChallenge
+      tags: [Authentication]
+      summary: Verify a signup challenge and create the account
+      description: Verifies the signup challenge code, creates the account, and starts an Authara session.
+      parameters:
+        - $ref: "#/components/parameters/AppAudience"
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-availability: challenges-enabled
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "403": [forbidden]
+        "404": [not_found]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupChallengeVerification"
+      responses:
+        "201":
+          description: Created account and authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/password-reset/challenges:
+    post:
+      operationId: startPasswordResetChallenge
+      tags: [Authentication]
+      summary: Start a password reset challenge
+      description: >
+        Starts recovery for an existing password without revealing whether the
+        email belongs to an account or whether the account has a password.
+        Unknown and passwordless accounts receive the same accepted response but
+        no reset code. Passwordless users must authenticate with an existing
+        provider or passkey before adding a password.
+      parameters:
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "403": [forbidden]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetRequest"
+      responses:
+        "202":
+          description: Password reset challenge accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeReference"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/password-reset/challenges/verify:
+    post:
+      operationId: verifyPasswordResetChallenge
+      tags: [Authentication]
+      summary: Verify a password reset challenge
+      description: >
+        Verifies the emailed code, atomically changes an existing password,
+        revokes all existing sessions, and consumes the challenge. This operation
+        never adds a password provider to a passwordless account.
+      parameters:
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "403": [forbidden]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetChallengeVerification"
+      responses:
+        "204":
+          description: Password reset completed and existing sessions revoked
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/challenges/resend:
+    post:
+      operationId: resendChallenge
+      tags: [Authentication]
+      summary: Request another challenge verification code
+      description: Queues another verification code for an existing signup or recovery challenge.
+      parameters:
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "403": [forbidden]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChallengeReference"
+      responses:
+        "204":
+          description: Challenge resend accepted without revealing challenge state
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/passkeys/authenticate/options:
+    post:
+      operationId: beginPasskeyAuthentication
+      tags: [Passkeys]
+      summary: Start passkey authentication
+      description: Creates a passkey authentication challenge and returns WebAuthn options for the client.
+      parameters:
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "403": [forbidden]
+        "429": [rate_limited]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Passkey authentication options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyOptions"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/passkeys/authenticate/finish:
+    post:
+      operationId: finishPasskeyAuthentication
+      tags: [Passkeys]
+      summary: Finish passkey authentication
+      description: Verifies the passkey assertion and creates an Authara session for the matching user.
+      parameters:
+        - $ref: "#/components/parameters/Audience"
+        - $ref: "#/components/parameters/SessionTransport"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasskeyAuthenticationFinishRequest"
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/passkeys/register/options:
+    post:
+      operationId: beginPasskeyRegistration
+      tags: [Passkeys]
+      summary: Start passkey registration
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-error-codes:
+        "401": [unauthorized]
+        "403": [forbidden]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Passkey registration options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyOptions"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/reauthenticate/check:
+    post:
+      operationId: checkRecentAuthentication
+      tags: [Sessions]
+      summary: Require recent authentication for an application action
+      description: Lets an application backend apply Authara's recent-authentication policy before performing a sensitive server-side operation. A stale session receives an authentication challenge; a fresh session receives no content.
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-error-codes:
+        "401": [unauthorized]
+        "403": [forbidden]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      responses:
+        "204":
+          description: The current session satisfies the recent-authentication policy
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/reauthenticate/password:
+    post:
+      operationId: reauthenticateWithPassword
+      tags: [Sessions]
+      summary: Reauthenticate the current session with a password
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "409": [invalid_authentication_challenge]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordReauthenticationRequest"
+      responses:
+        "204":
+          description: Session reauthenticated
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/reauthenticate/google:
+    post:
+      operationId: reauthenticateWithGoogle
+      tags: [Sessions]
+      summary: Reauthenticate the current session with a linked Google identity
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-availability: google-enabled
+      x-authara-clear-cookies: [authara_oauth_nonce]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "404": [not_found]
+        "409": [invalid_authentication_challenge]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleReauthenticationRequest"
+      responses:
+        "204":
+          description: Session reauthenticated
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/reauthenticate/apple:
+    post:
+      operationId: reauthenticateWithApple
+      tags: [Sessions]
+      summary: Reauthenticate the current session with a linked Apple identity
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+          appleOAuthCookie: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-availability: apple-enabled
+      x-authara-set-cookies: [authara_apple_oauth]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "404": [not_found]
+        "409": [invalid_authentication_challenge]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppleReauthenticationRequest"
+      responses:
+        "204":
+          description: Session reauthenticated
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/reauthenticate/microsoft:
+    post:
+      operationId: reauthenticateWithMicrosoft
+      tags: [Sessions]
+      summary: Reauthenticate the current session with a linked Microsoft identity
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-availability: microsoft-enabled
+      x-authara-clear-cookies: [authara_oauth_nonce]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "404": [not_found]
+        "409": [invalid_authentication_challenge]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MicrosoftReauthenticationRequest"
+      responses:
+        "204":
+          description: Session reauthenticated
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/reauthenticate/passkeys/options:
+    post:
+      operationId: beginPasskeyReauthentication
+      tags: [Passkeys]
+      summary: Start passkey reauthentication for the current session
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "404": [not_found]
+        "409": [invalid_authentication_challenge]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthenticationChallengeReference"
+      responses:
+        "200":
+          description: Passkey reauthentication options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyOptions"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/reauthenticate/passkeys/finish:
+    post:
+      operationId: finishPasskeyReauthentication
+      tags: [Passkeys]
+      summary: Finish passkey reauthentication for the current session
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "409": [invalid_authentication_challenge]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasskeyReauthenticationFinishRequest"
+      responses:
+        "204":
+          description: Session reauthenticated
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/passkeys/register/finish:
+    post:
+      operationId: finishPasskeyRegistration
+      tags: [Passkeys]
+      summary: Finish passkey registration
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "409": [passkey_already_exists]
+        "422": [passkey_registration_invalid]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasskeyRegistrationFinishRequest"
+      responses:
+        "204":
+          description: Passkey registered
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/sessions/logout:
+    post:
+      operationId: logout
+      tags: [Sessions]
+      summary: Log out the current session
+      description: Revokes the current cookie-backed session and clears Authara session cookies.
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-clear-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "403": [forbidden]
+        "500": [internal_error]
+      responses:
+        "204":
+          description: Logged out
+        "403":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/sessions/refresh:
+    post:
+      operationId: refreshSession
+      tags: [Sessions]
+      summary: Refresh a cookie-backed session
+      description: Rotates a refresh-cookie session and returns a fresh access token for the selected audience.
+      parameters:
+        - $ref: "#/components/parameters/Audience"
+      security:
+        - refreshCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: public
+      x-authara-csrf: required
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Session refreshed
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/tokens/refresh:
+    post:
+      operationId: refreshTokens
+      tags: [Sessions]
+      summary: Refresh tokens supplied in JSON
+      description: Rotates a JSON refresh token and returns a new access and refresh token pair.
+      security: []
+      x-authara-access: public
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRefreshRequest"
+      responses:
+        "200":
+          description: Rotated tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/tokens/revoke:
+    post:
+      operationId: revokeTokens
+      tags: [Sessions]
+      summary: Revoke a token-backed session
+      description: Revokes the session family identified by a JSON refresh token. Repeated revocation is successful.
+      security: []
+      x-authara-access: public
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRevocationRequest"
+      responses:
+        "204":
+          description: Token family revoked or already absent
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/user:
+    get:
+      operationId: getCurrentUser
+      tags: [Users]
+      summary: Get the authenticated user
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-error-codes:
+        "401": [unauthorized]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUser"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account:
+    get:
+      operationId: getCurrentAccount
+      tags: [Users]
+      summary: Get the authenticated user's account
+      description: Returns the account profile, active sessions, linked authentication methods, and passkeys.
+      parameters:
+        - $ref: "#/components/parameters/SessionsCursor"
+        - $ref: "#/components/parameters/SessionsLimit"
+        - $ref: "#/components/parameters/PasskeysCursor"
+        - $ref: "#/components/parameters/PasskeysLimit"
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/username:
+    patch:
+      operationId: changeCurrentUsername
+      tags: [Users]
+      summary: Change the authenticated user's username
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "409": [username_taken]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeUsernameRequest"
+      responses:
+        "204":
+          description: Username changed
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/email-change/challenges:
+    post:
+      operationId: startCurrentUserEmailChange
+      tags: [Users]
+      summary: Start an email change challenge
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-availability: challenges-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailChangeRequest"
+      responses:
+        "202":
+          description: Email change challenge started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeReference"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/email-change/challenges/verify:
+    post:
+      operationId: verifyCurrentUserEmailChange
+      tags: [Users]
+      summary: Verify an email change challenge
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-availability: challenges-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "428": [recent_authentication_required]
+        "429": [rate_limited]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChallengeVerification"
+      responses:
+        "204":
+          description: Email changed
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/password:
+    post:
+      operationId: addCurrentUserPassword
+      tags: [Users]
+      summary: Add password authentication to the authenticated user's account
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "409": [password_already_exists]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPasswordRequest"
+      responses:
+        "204":
+          description: Password authentication added
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: changeCurrentUserPassword
+      tags: [Users]
+      summary: Change the authenticated user's password
+      description: >-
+        Verifies the current password before replacing it. A successful change
+        preserves the initiating session, revokes every other session family,
+        and invalidates all outstanding password-reset requests. Without a
+        shared revocation cache, access tokens already issued to revoked
+        sessions remain valid until they expire.
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "404": [not_found]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "204":
+          description: Password changed, other sessions revoked, and pending resets invalidated
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/auth-methods/google:
+    post:
+      operationId: linkCurrentUserGoogle
+      tags: [Users]
+      summary: Link Google to the authenticated user's account
+      description: Uses options from getGoogleLoginOptions and links the verified Google identity to the current account.
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-availability: google-enabled
+      x-authara-clear-cookies: [authara_oauth_nonce]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "409": [auth_method_already_linked]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleLoginRequest"
+      responses:
+        "204":
+          description: Google linked
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/auth-methods/apple:
+    post:
+      operationId: linkCurrentUserApple
+      tags: [Users]
+      summary: Link Apple to the authenticated user's account
+      description: Uses options from getAppleLoginOptions and links the verified Apple identity to the current account.
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+          appleOAuthCookie: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-availability: apple-enabled
+      x-authara-set-cookies: [authara_apple_oauth]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "409": [auth_method_already_linked]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppleAuthorizationRequest"
+      responses:
+        "204":
+          description: Apple linked
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/auth-methods/microsoft:
+    post:
+      operationId: linkCurrentUserMicrosoft
+      tags: [Users]
+      summary: Link Microsoft to the authenticated user's account
+      description: Uses options from getMicrosoftLoginOptions and links the verified Microsoft identity to the current account.
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+          oauthNonceCookie: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-availability: microsoft-enabled
+      x-authara-clear-cookies: [authara_oauth_nonce]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "409": [auth_method_already_linked]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MicrosoftLoginRequest"
+      responses:
+        "204":
+          description: Microsoft linked
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/auth-methods/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/AuthProvider"
+    delete:
+      operationId: unlinkCurrentUserAuthMethod
+      tags: [Users]
+      summary: Unlink an authentication method from the authenticated user's account
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "404": [not_found]
+        "409": [cannot_remove_last_auth_method]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      responses:
+        "204":
+          description: Authentication method unlinked
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/passkeys/{passkeyID}:
+    parameters:
+      - $ref: "#/components/parameters/PasskeyID"
+    delete:
+      operationId: deleteCurrentUserPasskey
+      tags: [Passkeys]
+      summary: Delete a passkey from the authenticated user's account
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "404": [not_found]
+        "409": [cannot_remove_last_auth_method]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      responses:
+        "204":
+          description: Passkey deleted
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/sessions/others:
+    delete:
+      operationId: revokeCurrentUserOtherSessions
+      tags: [Sessions]
+      summary: Revoke all sessions except the current session
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "401": [unauthorized]
+        "403": [forbidden]
+        "500": [internal_error]
+      responses:
+        "204":
+          description: Other sessions revoked
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/account/sessions/{sessionID}:
+    parameters:
+      - $ref: "#/components/parameters/SessionID"
+    delete:
+      operationId: revokeCurrentUserSession
+      tags: [Sessions]
+      summary: Revoke one of the authenticated user's sessions
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found]
+        "500": [internal_error]
+      responses:
+        "204":
+          description: Session revoked
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/users/password:
+    put:
+      operationId: setCurrentUserPassword
+      tags: [Users]
+      summary: Set the authenticated user's password
+      description: Creates the password authentication method for a passwordless user identified by the access token and revokes all existing sessions. Returns a conflict when the user already has a password; use the account password endpoint to change it.
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "409": [password_already_exists]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPasswordRequest"
+      responses:
+        "204":
+          description: Password set and existing sessions revoked
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/organizations:
+    get:
+      operationId: listCurrentUserOrganizations
+      tags: [Organizations]
+      summary: List organizations for the authenticated user
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: User organizations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationSummaries"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+  /auth/api/v1/organizations/current:
+    get:
+      operationId: getCurrentOrganization
+      tags: [Organizations]
+      summary: Get the organization in the current access token
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-error-codes:
+        "401": [unauthorized]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Current organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationSummary"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/organizations/current/members:
+    get:
+      operationId: listCurrentOrganizationMembers
+      tags: [Organizations]
+      summary: List members of the current organization
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Current organization members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentOrganizationMembers"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/organizations/{organizationID}/switch:
+    post:
+      operationId: switchOrganization
+      tags: [Organizations]
+      summary: Switch the current session to another organization
+      parameters:
+        - $ref: "#/components/parameters/OrganizationID"
+        - $ref: "#/components/parameters/Audience"
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-set-cookies: [authara_access, authara_refresh]
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Rotated tokens for the selected organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/capabilities:
+    get:
+      operationId: getPublicCapabilities
+      tags: [Organizations]
+      summary: Get organization capabilities
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-error-codes:
+        "401": [unauthorized]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Organization capabilities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capabilities"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/organizations/{organizationID}:
+    parameters:
+      - $ref: "#/components/parameters/OrganizationID"
+    get:
+      operationId: getPublicOrganization
+      tags: [Organizations]
+      summary: Get an organization
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, organization_not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updatePublicOrganization
+      tags: [Organizations]
+      summary: Update an organization
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, organization_not_found]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationRequest"
+      responses:
+        "200":
+          description: Updated organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/organizations/{organizationID}/members:
+    get:
+      operationId: listPublicOrganizationMembers
+      tags: [Organizations]
+      summary: List organization members
+      parameters:
+        - $ref: "#/components/parameters/OrganizationID"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, organization_not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Organization members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationMembers"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/organizations/{organizationID}/members/{userID}:
+    get:
+      operationId: getPublicOrganizationMember
+      tags: [Organizations]
+      summary: Get an organization member
+      parameters:
+        - $ref: "#/components/parameters/OrganizationID"
+        - $ref: "#/components/parameters/UserID"
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, organization_not_found, membership_not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Organization member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationMemberEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updatePublicOrganizationMember
+      tags: [Organizations]
+      summary: Update an organization member role
+      description: Assigns the admin or member role; ownership changes use the ownership-transfer operation.
+      parameters:
+        - $ref: "#/components/parameters/OrganizationID"
+        - $ref: "#/components/parameters/UserID"
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, organization_not_found, membership_not_found]
+        "409": [last_organization_owner]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationMemberRequest"
+      responses:
+        "200":
+          description: Updated organization member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationMemberEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/organizations/{organizationID}/invitations:
+    parameters:
+      - $ref: "#/components/parameters/OrganizationID"
+    get:
+      operationId: listPublicOrganizationInvitations
+      tags: [Organizations]
+      summary: List organization invitations
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, organization_not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Organization invitations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationInvitations"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+  /auth/api/v1/organizations/{organizationID}/invitations/{invitationID}:
+    get:
+      operationId: getPublicOrganizationInvitation
+      tags: [Organizations]
+      summary: Get an organization invitation
+      parameters:
+        - $ref: "#/components/parameters/OrganizationID"
+        - $ref: "#/components/parameters/InvitationID"
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, invitation_not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Organization invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationInvitationEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/organizations/{organizationID}/invitations/{invitationID}/revoke:
+    post:
+      operationId: revokePublicOrganizationInvitation
+      tags: [Organizations]
+      summary: Revoke an organization invitation
+      parameters:
+        - $ref: "#/components/parameters/OrganizationID"
+        - $ref: "#/components/parameters/InvitationID"
+      security:
+        - accessCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      x-authara-access: user
+      x-authara-csrf: required
+      x-authara-recent-auth: required
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, organization_not_found, invitation_not_found, user_not_found]
+        "409": [invitation_already_accepted, invitation_revoked, invitation_expired]
+        "428": [recent_authentication_required]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: Revoked invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationInvitationEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "428":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/api/v1/users/{userID}/memberships:
+    get:
+      operationId: listPublicUserMemberships
+      tags: [Organizations]
+      summary: List memberships for the authenticated user
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      security:
+        - accessCookie: []
+      x-authara-access: user
+      x-authara-availability: public-organization-management-enabled
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [not_found, user_not_found]
+        "500": [internal_error]
+      responses:
+        "200":
+          description: User memberships
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserMemberships"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/internal/v1/organizations:
+    post:
+      operationId: createInternalOrganization
+      tags: [Internal]
+      summary: Create a team organization
+      description: Creates a team organization on behalf of a specified user for trusted internal callers.
+      security:
+        - internalBearer: []
+      x-authara-access: internal
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [user_not_found]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalCreateOrganizationRequest"
+      responses:
+        "201":
+          description: Created organization and owner membership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationWithMembership"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/internal/v1/organizations/{organizationID}:
+    parameters:
+      - $ref: "#/components/parameters/OrganizationID"
+    delete:
+      operationId: deleteInternalOrganization
+      tags: [Internal]
+      summary: Delete a team organization
+      description: Permanently deletes a team organization after the application backend has approved product-specific dependencies such as subscriptions.
+      security:
+        - internalBearer: []
+      x-authara-access: internal
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [actor_not_member, actor_not_allowed]
+        "404": [organization_not_found]
+        "409": [personal_organization_immutable, organization_has_other_members]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalOrganizationActorRequest"
+      responses:
+        "204":
+          description: Organization deleted
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/internal/v1/organizations/{organizationID}/members/{userID}:
+    parameters:
+      - $ref: "#/components/parameters/OrganizationID"
+      - $ref: "#/components/parameters/UserID"
+    patch:
+      operationId: updateInternalOrganizationMember
+      tags: [Internal]
+      summary: Update an organization member role
+      description: Assigns the admin or member role on behalf of an authorized organization owner or admin.
+      security:
+        - internalBearer: []
+      x-authara-access: internal
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [actor_not_member, actor_not_allowed]
+        "404": [organization_not_found, membership_not_found]
+        "409": [last_organization_owner]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalUpdateOrganizationMemberRequest"
+      responses:
+        "200":
+          description: Updated organization member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationMemberEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: removeInternalOrganizationMember
+      tags: [Internal]
+      summary: Remove an organization member
+      description: Removes a membership after the application backend has approved the departure; using the target user as actor represents a voluntary leave.
+      security:
+        - internalBearer: []
+      x-authara-access: internal
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [actor_not_member, actor_not_allowed]
+        "404": [organization_not_found, membership_not_found]
+        "409": [personal_organization_immutable, last_organization_owner, last_organization_member]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalOrganizationActorRequest"
+      responses:
+        "204":
+          description: Membership removed
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/internal/v1/organizations/{organizationID}/ownership-transfer:
+    parameters:
+      - $ref: "#/components/parameters/OrganizationID"
+    post:
+      operationId: transferInternalOrganizationOwnership
+      tags: [Internal]
+      summary: Transfer organization ownership
+      description: Atomically promotes a member to owner and demotes the current owner to admin.
+      security:
+        - internalBearer: []
+      x-authara-access: internal
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [actor_not_member, actor_not_allowed]
+        "404": [organization_not_found, membership_not_found]
+        "409": [personal_organization_immutable]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalOwnershipTransferRequest"
+      responses:
+        "204":
+          description: Ownership transferred
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/internal/v1/organizations/{organizationID}/invitations:
+    parameters:
+      - $ref: "#/components/parameters/OrganizationID"
+    post:
+      operationId: createInternalOrganizationInvitation
+      tags: [Internal]
+      summary: Create an organization invitation
+      description: Creates an organization invitation using an explicit internal actor user.
+      security:
+        - internalBearer: []
+      x-authara-access: internal
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [actor_not_member, actor_not_allowed]
+        "404": [organization_not_found]
+        "409": [already_member, invitation_already_pending]
+        "500": [internal_error]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalCreateInvitationRequest"
+      responses:
+        "201":
+          description: Created invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationInvitationEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/internal/v1/organizations/{organizationID}/invitations/{invitationID}/resend:
+    post:
+      operationId: resendInternalOrganizationInvitation
+      tags: [Internal]
+      summary: Replace an organization invitation with a fresh invitation
+      description: Revokes the existing invitation and creates a fresh invitation for trusted internal callers.
+      parameters:
+        - $ref: "#/components/parameters/OrganizationID"
+        - $ref: "#/components/parameters/InvitationID"
+      security:
+        - internalBearer: []
+      x-authara-access: internal
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "403": [forbidden]
+        "404": [organization_not_found, invitation_not_found]
+        "409": [already_member, invitation_already_pending, invitation_already_accepted, invitation_revoked]
+        "500": [internal_error]
+      responses:
+        "201":
+          description: Fresh invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationInvitationEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/internal/v1/users/{userID}:
+    parameters:
+      - $ref: "#/components/parameters/UserID"
+    delete:
+      operationId: deleteInternalUser
+      tags: [Internal]
+      summary: Delete a user
+      description: Permanently deletes a user after the application backend has approved account-level dependencies such as active subscriptions.
+      security:
+        - internalBearer: []
+      x-authara-access: internal
+      x-authara-error-codes:
+        "400": [invalid_request]
+        "401": [unauthorized]
+        "404": [user_not_found]
+        "409": [last_active_admin, last_organization_owner, last_organization_member]
+        "500": [internal_error]
+      responses:
+        "204":
+          description: User deleted
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+components:
+  securitySchemes:
+    accessCookie:
+      type: apiKey
+      in: cookie
+      name: authara_access
+    accessBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      x-authara-auth-mode: access_bearer
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: authara_refresh
+    csrfCookie:
+      type: apiKey
+      in: cookie
+      name: authara_csrf
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+    oauthNonceCookie:
+      type: apiKey
+      in: cookie
+      name: authara_oauth_nonce
+    appleOAuthCookie:
+      type: apiKey
+      in: cookie
+      name: authara_apple_oauth
+    internalBearer:
+      type: http
+      scheme: bearer
+      x-authara-auth-mode: internal_bearer
+
+  parameters:
+    SessionTransport:
+      name: session_transport
+      in: query
+      required: false
+      description: Use token for native or other non-cookie clients. Token transport returns JSON tokens without setting session cookies and does not require browser CSRF credentials.
+      schema:
+        type: string
+        enum: [cookie, token]
+        default: cookie
+    SessionsCursor:
+      name: sessions_cursor
+      in: query
+      required: false
+      description: Opaque cursor for the active-session collection.
+      schema:
+        type: string
+    SessionsLimit:
+      name: sessions_limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    PasskeysCursor:
+      name: passkeys_cursor
+      in: query
+      required: false
+      description: Opaque cursor for the passkey collection.
+      schema:
+        type: string
+    PasskeysLimit:
+      name: passkeys_limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor returned by the preceding page.
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of collection items to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    Audience:
+      name: audience
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [app, admin, operator]
+        default: app
+    AppAudience:
+      name: audience
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [app]
+        default: app
+    OrganizationID:
+      name: organizationID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserID:
+      name: userID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InvitationID:
+      name: invitationID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionID:
+      name: sessionID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PasskeyID:
+      name: passkeyID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProviderLinkID:
+      name: linkID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AuthProvider:
+      name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [password, google, apple, microsoft]
+
+  responses:
+    Error:
+      description: Error response declared by x-authara-error-codes
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/APIError"
+        authentication_challenge:
+          $ref: "#/components/schemas/AuthenticationChallenge"
+        reauthenticate_url:
+          type: string
+        recovery:
+          $ref: "#/components/schemas/AccountRecoveryLink"
+    APIError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    CSRFToken:
+      type: object
+      additionalProperties: false
+      required: [csrf_token]
+      properties:
+        csrf_token:
+          type: string
+    GoogleLoginOptions:
+      type: object
+      additionalProperties: false
+      required: [client_id, nonce]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+        nonce:
+          type: string
+    GoogleLoginRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        credential:
+          type: string
+          description: Legacy Google ID token. Must be provided together with nonce when code is omitted.
+        nonce:
+          type: string
+          description: Legacy Google ID-token nonce. Must be provided together with credential when code is omitted.
+        code:
+          type: string
+          description: One-time Google authorization code. Must be provided together with redirect_uri.
+        redirect_uri:
+          type: string
+          format: uri
+          description: Browser origin used by the Google popup code flow. Must be provided together with code.
+    AppleLoginOptions:
+      type: object
+      additionalProperties: false
+      required: [client_id, redirect_uri, state, nonce]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+        redirect_uri:
+          type: string
+          format: uri
+        state:
+          type: string
+        nonce:
+          type: string
+    AppleAuthorizationRequest:
+      type: object
+      additionalProperties: false
+      required: [code, state]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        state:
+          type: string
+        invitation_token:
+          type: string
+    MicrosoftLoginOptions:
+      type: object
+      additionalProperties: false
+      required: [client_id, authority, nonce]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+        authority:
+          type: string
+          format: uri
+        nonce:
+          type: string
+    MicrosoftLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [credential, nonce]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        credential:
+          type: string
+          description: Microsoft v2 ID token returned by the popup authorization-code flow.
+        nonce:
+          type: string
+        invitation_token:
+          type: string
+    InvitationTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+    InvitationPasswordLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          format: password
+    InvitationGoogleRequest:
+      type: object
+      additionalProperties: false
+      required: [token, flow]
+      properties:
+        token:
+          type: string
+        credential:
+          type: string
+          description: Legacy Google ID token. Must be provided together with nonce when code is omitted.
+        nonce:
+          type: string
+          description: Legacy Google ID-token nonce. Must be provided together with credential when code is omitted.
+        code:
+          type: string
+          description: One-time Google authorization code. Must be provided together with redirect_uri.
+        redirect_uri:
+          type: string
+          format: uri
+          description: Browser origin used by the Google popup code flow. Must be provided together with code.
+        flow:
+          type: string
+          enum: [signup, login]
+    AccountRecoveryPasswordProofRequest:
+      type: object
+      additionalProperties: false
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
+        invitation_token:
+          type: string
+    AccountRecoveryGoogleProofRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+          description: OAuth challenge returned by the login-options endpoint for token-transport clients.
+        credential:
+          type: string
+          description: Legacy Google ID token. Must be provided together with nonce when code is omitted.
+        nonce:
+          type: string
+          description: Legacy Google ID-token nonce. Must be provided together with credential when code is omitted.
+        code:
+          type: string
+          description: One-time Google authorization code. Must be provided together with redirect_uri.
+        redirect_uri:
+          type: string
+          format: uri
+          description: Browser origin used by the Google popup code flow. Must be provided together with code.
+        invitation_token:
+          type: string
+    AccountRecoveryAppleProofRequest:
+      type: object
+      additionalProperties: false
+      required: [code, state]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+          description: OAuth challenge returned by the login-options endpoint for token-transport clients.
+        code:
+          type: string
+        state:
+          type: string
+        invitation_token:
+          type: string
+    AccountRecoveryMicrosoftProofRequest:
+      type: object
+      additionalProperties: false
+      required: [credential, nonce]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+          description: OAuth challenge returned by the login-options endpoint for token-transport clients.
+        credential:
+          type: string
+        nonce:
+          type: string
+        invitation_token:
+          type: string
+    PasswordLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier, password]
+      properties:
+        identifier:
+          type: string
+          description: The user's email address, or username when AUTHARA_USERNAME_LOGIN_ENABLED=true.
+        password:
+          type: string
+          format: password
+    SignupRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        invitation_code:
+          type: string
+    SignupChallenge:
+      type: object
+      additionalProperties: false
+      required: [challenge_id]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+    SignupChallengeVerification:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, code]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+    PasswordResetRequest:
+      type: object
+      additionalProperties: false
+      required: [email, new_password]
+      properties:
+        email:
+          type: string
+          format: email
+        new_password:
+          type: string
+          format: password
+    PasswordResetChallengeVerification:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, code]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+    SetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
+    PasswordReauthenticationRequest:
+      type: object
+      additionalProperties: false
+      required: [authentication_challenge_id, password]
+      properties:
+        authentication_challenge_id:
+          type: string
+          format: uuid
+        password:
+          type: string
+          format: password
+    GoogleReauthenticationRequest:
+      type: object
+      additionalProperties: false
+      required: [authentication_challenge_id]
+      properties:
+        authentication_challenge_id:
+          type: string
+          format: uuid
+        credential:
+          type: string
+          description: Legacy Google ID token. Must be provided together with nonce when code is omitted.
+        nonce:
+          type: string
+          description: Legacy Google ID-token nonce. Must be provided together with credential when code is omitted.
+        code:
+          type: string
+          description: One-time Google authorization code. Must be provided together with redirect_uri.
+        redirect_uri:
+          type: string
+          format: uri
+          description: Browser origin used by the Google popup code flow. Must be provided together with code.
+    AppleReauthenticationRequest:
+      type: object
+      additionalProperties: false
+      required: [authentication_challenge_id, code, state]
+      properties:
+        authentication_challenge_id:
+          type: string
+          format: uuid
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        state:
+          type: string
+    MicrosoftReauthenticationRequest:
+      type: object
+      additionalProperties: false
+      required: [authentication_challenge_id, credential, nonce]
+      properties:
+        authentication_challenge_id:
+          type: string
+          format: uuid
+        credential:
+          type: string
+        nonce:
+          type: string
+    AuthenticationChallengeReference:
+      type: object
+      additionalProperties: false
+      required: [authentication_challenge_id]
+      properties:
+        authentication_challenge_id:
+          type: string
+          format: uuid
+    AuthenticationChallenge:
+      type: object
+      additionalProperties: false
+      required: [id, expires_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+    ChangePasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+    ChangeUsernameRequest:
+      type: object
+      additionalProperties: false
+      required: [username]
+      properties:
+        username:
+          type: string
+    EmailChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [new_email]
+      properties:
+        new_email:
+          type: string
+          format: email
+    ChallengeVerification:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, code]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+    ChallengeReference:
+      type: object
+      additionalProperties: false
+      required: [challenge_id]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+
+    AccountRecoveryLink:
+      type: object
+      additionalProperties: false
+      required: [link_id, provider, proof_methods]
+      properties:
+        link_id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          description: External provider that will be attached after existing-account proof succeeds.
+          enum: [google, apple, microsoft]
+        proof_methods:
+          type: array
+          items:
+            type: string
+            enum: [password, google, apple, microsoft]
+
+    InvitationPreview:
+      type: object
+      additionalProperties: false
+      required: [invitation, organization]
+      properties:
+        invitation:
+          $ref: "#/components/schemas/OrganizationInvitation"
+        organization:
+          $ref: "#/components/schemas/Organization"
+    InvitationGoogleResult:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [authenticated, proof_required]
+        session:
+          $ref: "#/components/schemas/AuthSession"
+        recovery:
+          $ref: "#/components/schemas/AccountRecoveryLink"
+
+    AuthSession:
+      type: object
+      additionalProperties: false
+      required: [user, access_token, refresh_token]
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+    AuthUser:
+      type: object
+      additionalProperties: false
+      required: [id, email, email_verified, username, disabled, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        email_verified:
+          type: boolean
+        email_verified_at:
+          type: string
+          format: date-time
+        username:
+          type: string
+        disabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    PasskeyOptions:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, options]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        options:
+          type: object
+          additionalProperties: true
+    PasskeyAuthenticationFinishRequest:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, credential]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        credential:
+          type: object
+          additionalProperties: true
+    PasskeyReauthenticationFinishRequest:
+      type: object
+      additionalProperties: false
+      required: [authentication_challenge_id, challenge_id, credential]
+      properties:
+        authentication_challenge_id:
+          type: string
+          format: uuid
+        challenge_id:
+          type: string
+          format: uuid
+        credential:
+          type: object
+          additionalProperties: true
+    PasskeyRegistrationFinishRequest:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, credential]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        credential:
+          type: object
+          additionalProperties: true
+        name:
+          type: string
+        platform_hint:
+          type: string
+
+    Tokens:
+      type: object
+      additionalProperties: false
+      required: [access_token, refresh_token]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+    TokenRefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+        audience:
+          type: string
+          enum: [app, admin, operator]
+          default: app
+    TokenRevocationRequest:
+      type: object
+      additionalProperties: false
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    CurrentUser:
+      type: object
+      additionalProperties: false
+      required: [id, email, email_verified, username, disabled, created_at, roles, organization]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        email_verified:
+          type: boolean
+        email_verified_at:
+          type: string
+          format: date-time
+        username:
+          type: string
+        disabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        roles:
+          type: array
+          items:
+            type: string
+            enum: ["authara:admin", "authara:operator"]
+        organization:
+          $ref: "#/components/schemas/OrganizationSummary"
+    Account:
+      type: object
+      additionalProperties: false
+      required: [user, sessions, auth_methods, passkeys]
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountSession"
+        sessions_next_cursor:
+          type: string
+        auth_methods:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthMethod"
+        passkeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountPasskey"
+        passkeys_next_cursor:
+          type: string
+    AccountSession:
+      type: object
+      additionalProperties: false
+      required: [id, current, created_at, expires_at, user_agent]
+      properties:
+        id:
+          type: string
+          format: uuid
+        current:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        user_agent:
+          type: string
+    AuthMethod:
+      type: object
+      additionalProperties: false
+      required: [provider, created_at]
+      properties:
+        provider:
+          type: string
+          enum: [password, google, apple, microsoft]
+        created_at:
+          type: string
+          format: date-time
+    AccountPasskey:
+      type: object
+      additionalProperties: false
+      required: [id, name, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+    OrganizationSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/OrganizationRole"
+    OrganizationSummaries:
+      type: object
+      additionalProperties: false
+      required: [organizations]
+      properties:
+        organizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizationSummary"
+        next_cursor:
+          type: string
+    CurrentOrganizationMember:
+      type: object
+      additionalProperties: false
+      required: [user_id, email, username, role, created_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        role:
+          $ref: "#/components/schemas/OrganizationRole"
+        created_at:
+          type: string
+          format: date-time
+    CurrentOrganizationMembers:
+      type: object
+      additionalProperties: false
+      required: [members]
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/CurrentOrganizationMember"
+        next_cursor:
+          type: string
+
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required:
+        - organization_mode
+        - has_visible_organizations
+        - allows_invitations
+        - allows_public_organization_management
+        - allows_org_switching
+        - allows_user_created_team_orgs
+        - allows_organization_leave
+      properties:
+        organization_mode:
+          type: string
+          enum: [personal, single, multi]
+        has_visible_organizations:
+          type: boolean
+        allows_invitations:
+          type: boolean
+        allows_public_organization_management:
+          type: boolean
+        allows_org_switching:
+          type: boolean
+        allows_user_created_team_orgs:
+          type: boolean
+        allows_organization_leave:
+          type: boolean
+
+    InternalCreateOrganizationRequest:
+      type: object
+      additionalProperties: false
+      required: [name, created_by_user_id]
+      properties:
+        name:
+          type: string
+        created_by_user_id:
+          type: string
+          format: uuid
+    InternalOrganizationActorRequest:
+      type: object
+      additionalProperties: false
+      required: [actor_user_id]
+      properties:
+        actor_user_id:
+          type: string
+          format: uuid
+    InternalOwnershipTransferRequest:
+      type: object
+      additionalProperties: false
+      required: [actor_user_id, new_owner_user_id]
+      properties:
+        actor_user_id:
+          type: string
+          format: uuid
+        new_owner_user_id:
+          type: string
+          format: uuid
+    UpdateOrganizationRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+    UpdateOrganizationMemberRequest:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties:
+        role:
+          $ref: "#/components/schemas/OrganizationMemberRole"
+    InternalUpdateOrganizationMemberRequest:
+      type: object
+      additionalProperties: false
+      required: [actor_user_id, role]
+      properties:
+        actor_user_id:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/OrganizationMemberRole"
+    InternalCreateInvitationRequest:
+      type: object
+      additionalProperties: false
+      required: [actor_user_id, email]
+      properties:
+        actor_user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/OrganizationInvitationRole"
+        metadata:
+          type: object
+          additionalProperties: true
+          default: {}
+          description: Opaque application metadata stored and forwarded by Authara.
+    RevokeInvitationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        revoked_by_user_id:
+          type: string
+          format: uuid
+
+    OrganizationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [organization]
+      properties:
+        organization:
+          $ref: "#/components/schemas/Organization"
+    OrganizationWithMembership:
+      type: object
+      additionalProperties: false
+      required: [organization, membership]
+      properties:
+        organization:
+          $ref: "#/components/schemas/Organization"
+        membership:
+          $ref: "#/components/schemas/Membership"
+    Organization:
+      type: object
+      additionalProperties: false
+      required: [id, created_at, updated_at, name, kind]
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [personal, team]
+        created_by_user_id:
+          type: string
+          format: uuid
+    Membership:
+      type: object
+      additionalProperties: false
+      required: [organization_id, user_id, role, created_at, updated_at]
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/OrganizationRole"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    OrganizationMember:
+      type: object
+      additionalProperties: false
+      required: [organization_id, user_id, email, username, role, created_at, updated_at, disabled]
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        role:
+          $ref: "#/components/schemas/OrganizationRole"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        disabled:
+          type: boolean
+    OrganizationMembers:
+      type: object
+      additionalProperties: false
+      required: [members]
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizationMember"
+        next_cursor:
+          type: string
+    OrganizationMemberEnvelope:
+      type: object
+      additionalProperties: false
+      required: [member]
+      properties:
+        member:
+          $ref: "#/components/schemas/OrganizationMember"
+    OrganizationInvitation:
+      type: object
+      additionalProperties: false
+      required: [id, organization_id, email, role, metadata, status, expires_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/OrganizationRole"
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Opaque application metadata stored with the invitation.
+        status:
+          type: string
+          enum: [pending, accepted, revoked, expired]
+        expires_at:
+          type: string
+          format: date-time
+        invite_url:
+          type: string
+          format: uri
+    OrganizationInvitationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [invitation]
+      properties:
+        invitation:
+          $ref: "#/components/schemas/OrganizationInvitation"
+    OrganizationInvitations:
+      type: object
+      additionalProperties: false
+      required: [invitations]
+      properties:
+        invitations:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizationInvitation"
+        next_cursor:
+          type: string
+    MembershipWithOrganization:
+      type: object
+      additionalProperties: false
+      required: [organization, membership]
+      properties:
+        organization:
+          $ref: "#/components/schemas/Organization"
+        membership:
+          $ref: "#/components/schemas/Membership"
+    UserMemberships:
+      type: object
+      additionalProperties: false
+      required: [memberships]
+      properties:
+        memberships:
+          type: array
+          items:
+            $ref: "#/components/schemas/MembershipWithOrganization"
+        next_cursor:
+          type: string
+    OrganizationRole:
+      type: string
+      enum: [owner, admin, member]
+    OrganizationMemberRole:
+      type: string
+      enum: [admin, member]
+      description: Mutable member role. Ownership changes use the ownership-transfer operation.
+    OrganizationInvitationRole:
+      type: string
+      enum: [admin, member]
+      default: member
+      description: Authara organization role granted when the invitation is accepted. Owner is reserved for the organization creator.

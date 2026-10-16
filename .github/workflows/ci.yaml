@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Read generated source
+        id: generated-source
+        run: |
+          core_version="$(jq -r '.core.version' .codegen/manifest.json)"
+          echo "core_sha=$(jq -r '.core.commit' .codegen/manifest.json)" >> "$GITHUB_OUTPUT"
+          if test "$core_version" = unreleased; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout generated Core source
+        if: steps.generated-source.outputs.released == 'true'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          repository: authara-org/authara
+          ref: ${{ steps.generated-source.outputs.core_sha }}
+          path: .authara-core-source
+          token: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
+
+      - name: Verify generated source integrity
+        run: |
+          expected_sha="$(jq -r '.core.contractSha256' .codegen/manifest.json)"
+          vendored_sha="$(sha256sum .codegen/openapi.yaml | cut -d ' ' -f 1)"
+          test "$vendored_sha" = "$expected_sha"
+          if test "${{ steps.generated-source.outputs.released }}" = true; then
+            core_sha="$(sha256sum .authara-core-source/contract/openapi.yaml | cut -d ' ' -f 1)"
+            test "$core_sha" = "$expected_sha"
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run check:format
+
+      - name: Check generated SDK drift
+        run: npm run check:generated
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Install iOS simulator dependencies
+        run: npm ci --prefix examples/ios-simulator
+
+      - name: Type-check iOS simulator
+        run: npm run example:typecheck

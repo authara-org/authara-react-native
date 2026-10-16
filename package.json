@@ -1,0 +1,116 @@
+{
+  "name": "@authara/react-native",
+  "version": "0.0.0",
+  "description": "Official React Native client, hooks, and native-provider buttons for Authara",
+  "keywords": [
+    "authentication",
+    "expo",
+    "oauth",
+    "react-native",
+    "typescript"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/authara-org/authara-react-native.git"
+  },
+  "homepage": "https://github.com/authara-org/authara-react-native#readme",
+  "bugs": {
+    "url": "https://github.com/authara-org/authara-react-native/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./expo-secure-store": {
+      "import": "./dist/expo-secure-store.js",
+      "types": "./dist/expo-secure-store.d.ts"
+    },
+    "./expo-apple-authentication": {
+      "import": "./dist/expo-apple-authentication.js",
+      "types": "./dist/expo-apple-authentication.d.ts"
+    },
+    "./nitro-google-signin": {
+      "import": "./dist/nitro-google-signin.js",
+      "types": "./dist/nitro-google-signin.d.ts"
+    },
+    "./expo-microsoft-auth-session": {
+      "import": "./dist/expo-microsoft-auth-session.js",
+      "types": "./dist/expo-microsoft-auth-session.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "check:generated": "node scripts/generate.mjs --check",
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run test:typecheck && vitest run",
+    "test:typecheck": "tsc -p tsconfig.test.json",
+    "check:format": "prettier --check \"src/**/*.{ts,tsx}\" \"examples/ios-simulator/**/*.{ts,tsx,cjs,md}\" \"scripts/**/*.mjs\" \"docker-compose.playground*.yaml\" \"README.md\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"examples/ios-simulator/**/*.{ts,tsx,cjs,md}\" \"scripts/**/*.mjs\" \"docker-compose.playground*.yaml\" \"README.md\"",
+    "example:core": "bash scripts/example-core.sh up",
+    "example:core:down": "bash scripts/example-core.sh down",
+    "example:core:logs": "bash scripts/example-core.sh logs",
+    "example:ios": "bash scripts/example-ios.sh native",
+    "example:ios:go": "bash scripts/example-ios.sh go",
+    "example:typecheck": "npm --prefix examples/ios-simulator run typecheck",
+    "prepublishOnly": "npm run check:generated && npm run build"
+  },
+  "peerDependencies": {
+    "expo-apple-authentication": ">=7 <9",
+    "expo-auth-session": ">=6 <8",
+    "expo-secure-store": ">=14 <16",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-native": ">=0.76",
+    "react-native-nitro-google-signin": ">=2 <3",
+    "react-native-nitro-modules": ">=0.36 <1",
+    "react-native-svg": ">=15 <16"
+  },
+  "peerDependenciesMeta": {
+    "expo-apple-authentication": {
+      "optional": true
+    },
+    "expo-auth-session": {
+      "optional": true
+    },
+    "expo-secure-store": {
+      "optional": true
+    },
+    "react-native-nitro-google-signin": {
+      "optional": true
+    },
+    "react-native-nitro-modules": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "expo-apple-authentication": "~8.0.8",
+    "expo-auth-session": "~7.0.11",
+    "expo-secure-store": "^15.0.8",
+    "expo-web-browser": "~15.0.11",
+    "prettier": "^3.8.1",
+    "react": "^19.1.1",
+    "react-native": "^0.81.0",
+    "react-native-nitro-google-signin": "^2.3.0",
+    "react-native-nitro-modules": "^0.37.1",
+    "react-native-svg": "^15.15.4",
+    "test-renderer": "1.3.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "yaml": "^2.9.0"
+  }
+}
