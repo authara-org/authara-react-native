@@ -199,6 +199,7 @@ export interface GoogleLoginRequest {
 
 export interface GoogleReauthenticationRequest {
   authentication_challenge_id: string;
+  challenge_id?: string;
   credential?: string;
   nonce?: string;
   code?: string;
@@ -263,6 +264,7 @@ export interface MicrosoftLoginRequest {
 
 export interface MicrosoftReauthenticationRequest {
   authentication_challenge_id: string;
+  challenge_id?: string;
   credential: string;
   nonce: string;
 }
