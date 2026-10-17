@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/authara-org/authara-react-native/compare/v0.1.0...v0.1.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **auth:** harden token lifecycle and playground ([#9](https://github.com/authara-org/authara-react-native/issues/9)) ([3e63171](https://github.com/authara-org/authara-react-native/commit/3e63171353204836560f57025e22b34d35544a2b))
+
 ## 0.1.0 (2026-10-17)
 
 
