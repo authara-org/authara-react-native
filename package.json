@@ -57,7 +57,7 @@
     "generate": "node scripts/generate.mjs",
     "check:generated": "node scripts/generate.mjs --check",
     "build": "tsc -p tsconfig.json",
-    "test": "npm run test:typecheck && vitest run",
+    "test": "npm run test:typecheck && vitest run src",
     "test:typecheck": "tsc -p tsconfig.test.json",
     "check:format": "prettier --check \"src/**/*.{ts,tsx}\" \"examples/ios-simulator/**/*.{ts,tsx,cjs,md}\" \"scripts/**/*.mjs\" \"docker-compose.playground*.yaml\" \"README.md\"",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"examples/ios-simulator/**/*.{ts,tsx,cjs,md}\" \"scripts/**/*.mjs\" \"docker-compose.playground*.yaml\" \"README.md\"",
