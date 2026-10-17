@@ -25,6 +25,7 @@ export interface AutharaClientOptions {
   baseUrl: string;
   storage: AutharaTokenStorage;
   audience?: AutharaAudience;
+  allowInsecureHttp?: boolean;
   fetch?: typeof globalThis.fetch;
 }
 
@@ -50,11 +51,22 @@ export class AutharaClient {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private refreshPromise?: Promise<boolean>;
+  private sessionGeneration = 0;
+  private storageMutation: Promise<void> = Promise.resolve();
   private snapshot: AutharaSessionSnapshot = { status: "loading", user: null };
   private readonly listeners = new Set<() => void>();
 
   constructor(options: AutharaClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/$/, "");
+    const baseUrl = new URL(options.baseUrl);
+    if (
+      baseUrl.protocol !== "https:" &&
+      !(options.allowInsecureHttp && baseUrl.protocol === "http:")
+    ) {
+      throw new Error(
+        "Authara baseUrl must use HTTPS unless allowInsecureHttp is enabled",
+      );
+    }
+    this.baseUrl = baseUrl.toString().replace(/\/$/, "");
     this.storage = options.storage;
     this.audience = options.audience ?? "app";
     const fetchImpl = options.fetch ?? globalThis.fetch;
@@ -77,7 +89,16 @@ export class AutharaClient {
   }
 
   protected async restoreTokens(): Promise<boolean> {
-    this.refreshToken = await this.storage.getRefreshToken();
+    const generation = this.sessionGeneration;
+    let refreshToken: string | null;
+    try {
+      refreshToken = await this.storage.getRefreshToken();
+    } catch {
+      if (this.sessionGeneration === generation) this.invalidateSession();
+      return false;
+    }
+    if (this.sessionGeneration !== generation) return false;
+    this.refreshToken = refreshToken;
     if (!this.refreshToken) {
       this.updateSnapshot({ status: "anonymous", user: null });
       return false;
@@ -90,9 +111,14 @@ export class AutharaClient {
   }
 
   async signOut(): Promise<void> {
-    const refreshToken =
-      this.refreshToken ?? (await this.storage.getRefreshToken());
+    let refreshToken = this.refreshToken;
+    this.invalidateSession();
+    const generation = this.sessionGeneration;
     try {
+      if (!refreshToken) {
+        refreshToken = await this.storage.getRefreshToken();
+        if (this.sessionGeneration !== generation) return;
+      }
       if (refreshToken) {
         await this.rawRequest("POST", "/auth/api/v1/tokens/revoke", {
           body: { refresh_token: refreshToken },
@@ -101,7 +127,7 @@ export class AutharaClient {
     } catch {
       // Local sign-out must still complete while offline.
     } finally {
-      await this.clearSession();
+      await this.removeStoredRefreshToken(generation);
     }
   }
 
@@ -115,6 +141,7 @@ export class AutharaClient {
       authenticated?: boolean;
     } = {},
   ): Promise<T> {
+    let generation = this.sessionGeneration;
     const query = { ...options.query };
     if (options.csrf && !options.authenticated)
       query.session_transport = "token";
@@ -129,6 +156,7 @@ export class AutharaClient {
       options.authenticated &&
       (await this.refresh())
     ) {
+      generation = this.sessionGeneration;
       response = await this.rawRequest(method, path, {
         ...options,
         query,
@@ -139,7 +167,7 @@ export class AutharaClient {
     const payload = await this.readJSON(response);
     if (!response.ok) throw new AutharaApiError(response.status, payload);
     if (response.status === 204) return undefined as T;
-    await this.captureTokens(payload);
+    await this.captureTokens(payload, generation);
     return payload as T;
   }
 
@@ -179,56 +207,135 @@ export class AutharaClient {
   private async refresh(): Promise<boolean> {
     if (!this.refreshToken) return false;
     if (!this.refreshPromise) {
-      this.refreshPromise = this.performRefresh().finally(() => {
-        this.refreshPromise = undefined;
+      const refreshToken = this.refreshToken;
+      const generation = this.sessionGeneration;
+      const refreshPromise = this.performRefresh(
+        refreshToken,
+        generation,
+      ).finally(() => {
+        if (this.refreshPromise === refreshPromise) {
+          this.refreshPromise = undefined;
+        }
       });
+      this.refreshPromise = refreshPromise;
     }
     return this.refreshPromise;
   }
 
-  private async performRefresh(): Promise<boolean> {
+  private async performRefresh(
+    refreshToken: string,
+    generation: number,
+  ): Promise<boolean> {
     let response: Response;
     try {
       response = await this.rawRequest("POST", "/auth/api/v1/tokens/refresh", {
-        body: { refresh_token: this.refreshToken, audience: this.audience },
+        body: { refresh_token: refreshToken, audience: this.audience },
       });
     } catch {
       return false;
     }
     if (response.status === 401) {
-      await this.clearSession();
+      if (this.sessionMatches(generation, refreshToken)) {
+        await this.clearSession();
+      }
       return false;
     }
     if (!response.ok) return false;
     const tokens = (await this.readJSON(response)) as Tokens | undefined;
     if (!tokens?.access_token || !tokens.refresh_token) return false;
-    await this.setTokens(tokens.access_token, tokens.refresh_token);
-    return true;
+    return this.setTokens(
+      tokens.access_token,
+      tokens.refresh_token,
+      generation,
+      refreshToken,
+    );
   }
 
-  private async captureTokens(payload: unknown): Promise<void> {
+  private async captureTokens(
+    payload: unknown,
+    generation: number,
+  ): Promise<void> {
     if (!payload || typeof payload !== "object") return;
     const candidate = payload as Partial<Tokens> & { user?: AuthUser };
     if (!candidate.access_token || !candidate.refresh_token) return;
-    await this.setTokens(candidate.access_token, candidate.refresh_token);
-    if (candidate.user) this.setCurrentUser(candidate.user);
+    const stored = await this.setTokens(
+      candidate.access_token,
+      candidate.refresh_token,
+      generation,
+    );
+    if (stored && candidate.user) this.setCurrentUser(candidate.user);
   }
 
   private async setTokens(
     accessToken: string,
     refreshToken: string,
-  ): Promise<void> {
+    expectedGeneration?: number,
+    expectedRefreshToken?: string,
+  ): Promise<boolean> {
+    if (
+      expectedGeneration !== undefined &&
+      !this.sessionMatches(expectedGeneration, expectedRefreshToken)
+    ) {
+      return false;
+    }
+    try {
+      await this.mutateStorage(() =>
+        this.storage.setRefreshToken(refreshToken),
+      );
+    } catch (error) {
+      if (
+        expectedGeneration === undefined ||
+        this.sessionMatches(expectedGeneration, expectedRefreshToken)
+      ) {
+        this.invalidateSession();
+      }
+      throw error;
+    }
+    if (
+      expectedGeneration !== undefined &&
+      !this.sessionMatches(expectedGeneration, expectedRefreshToken)
+    ) {
+      return false;
+    }
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
-    await this.storage.setRefreshToken(refreshToken);
+    this.sessionGeneration += 1;
     this.updateSnapshot({ status: "authenticated", user: this.snapshot.user });
+    return true;
   }
 
   private async clearSession(): Promise<void> {
+    this.invalidateSession();
+    await this.removeStoredRefreshToken(this.sessionGeneration);
+  }
+
+  private invalidateSession(): void {
+    this.sessionGeneration += 1;
+    this.refreshPromise = undefined;
     this.accessToken = null;
     this.refreshToken = null;
-    await this.storage.removeRefreshToken();
     this.updateSnapshot({ status: "anonymous", user: null });
+  }
+
+  private sessionMatches(generation: number, refreshToken?: string): boolean {
+    return (
+      this.sessionGeneration === generation &&
+      (refreshToken === undefined || this.refreshToken === refreshToken)
+    );
+  }
+
+  private removeStoredRefreshToken(generation: number): Promise<void> {
+    return this.mutateStorage(async () => {
+      if (this.sessionGeneration === generation) {
+        await this.storage.removeRefreshToken();
+      }
+    });
+  }
+
+  private mutateStorage(mutation: () => Promise<void>): Promise<void> {
+    const result = this.storageMutation.catch(() => undefined).then(mutation);
+    this.storageMutation = result;
+    return result;
   }
 
   private updateSnapshot(snapshot: AutharaSessionSnapshot): void {

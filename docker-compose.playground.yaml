@@ -14,7 +14,7 @@ services:
       - playground-postgres:/var/lib/postgresql/data
 
   migrations:
-    image: ghcr.io/authara-org/authara-migrations:${AUTHARA_MIGRATIONS_VERSION:-v0.3.0}
+    image: ghcr.io/authara-org/authara-migrations:${AUTHARA_MIGRATIONS_VERSION:-v0.4.0}
     environment:
       POSTGRESQL_HOST: postgres
       POSTGRESQL_PORT: 5432
@@ -44,7 +44,7 @@ services:
       - "${AUTHARA_MAILPIT_HTTP_PORT:-8026}:8025"
 
   authara:
-    image: ghcr.io/authara-org/authara-core:${AUTHARA_CORE_VERSION:-v0.25.0}
+    image: ghcr.io/authara-org/authara-core:${AUTHARA_CORE_VERSION:-v0.26.1}
     environment:
       APP_ENV: dev
       POSTGRESQL_HOST: postgres
@@ -56,10 +56,10 @@ services:
       PUBLIC_URL: ${AUTHARA_PUBLIC_URL:-https://playground.authara.org}
       AUTHARA_JWT_ISSUER: authara-react-native-playground
       AUTHARA_JWT_ACTIVE_KEY_ID: playground
-      AUTHARA_JWT_PRIVATE_KEYS: playground:MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+      AUTHARA_JWT_PRIVATE_KEYS: ${AUTHARA_JWT_PRIVATE_KEYS:?Set AUTHARA_JWT_PRIVATE_KEYS to playground:<base64-key> in the React Native .env}
       AUTHARA_CHALLENGE_ENABLED: "true"
       AUTHARA_CHALLENGE_VERIFICATION_CODE_ACTIVE_KEY_ID: playground-challenge
-      AUTHARA_CHALLENGE_VERIFICATION_CODE_KEYS: playground-challenge:YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXpBQkNERUY=
+      AUTHARA_CHALLENGE_VERIFICATION_CODE_KEYS: ${AUTHARA_CHALLENGE_VERIFICATION_CODE_KEYS:?Set AUTHARA_CHALLENGE_VERIFICATION_CODE_KEYS to playground-challenge:<base64-key> in the React Native .env}
       AUTHARA_CACHE_PROVIDER: redis
       AUTHARA_REDIS_HOST: redis
       AUTHARA_REDIS_PORT: 6379

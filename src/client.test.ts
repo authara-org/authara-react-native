@@ -20,6 +20,28 @@ function json(status: number, body?: unknown): Response {
 }
 
 describe("AutharaNativeClient", () => {
+  it("requires HTTPS unless insecure HTTP is explicitly enabled", () => {
+    const storage = createMemoryTokenStorage();
+    expect(() =>
+      createAuthara({ baseUrl: "http://auth.example.com", storage }),
+    ).toThrow("must use HTTPS");
+    expect(() =>
+      createAuthara({
+        baseUrl: "http://localhost:3002",
+        storage,
+        allowInsecureHttp: true,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      createAuthara({
+        baseUrl: "ftp://auth.example.com",
+        storage,
+        allowInsecureHttp: true,
+      }),
+    ).toThrow("must use HTTPS");
+    expect(() => createAuthara({ baseUrl: "not a URL", storage })).toThrow();
+  });
+
   it("persists refresh tokens, keeps access tokens in memory, and sends bearer auth", async () => {
     const storage = createMemoryTokenStorage();
     const fetch = vi.fn(
@@ -125,6 +147,393 @@ describe("AutharaNativeClient", () => {
 
     expect(await client.restore()).toBe(false);
     expect(await storage.getRefreshToken()).toBe("refresh-1");
+  });
+
+  it("does not restore a session after a refresh completes behind sign-out", async () => {
+    const storage = createMemoryTokenStorage();
+    let resolveRefresh!: (response: Response) => void;
+    const pendingRefresh = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const fetch = vi.fn(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        const path = new URL(String(url)).pathname;
+        if (path.endsWith("/login")) {
+          return json(200, {
+            user,
+            access_token: "expired-access",
+            refresh_token: "refresh-1",
+          });
+        }
+        if (path.endsWith("/tokens/refresh")) return pendingRefresh;
+        if (path.endsWith("/tokens/revoke")) return json(204);
+        const authorization = new Headers(init?.headers).get("Authorization");
+        return authorization === "Bearer fresh-access"
+          ? json(200, user)
+          : json(401, { error: { code: "unauthorized" } });
+      },
+    );
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage,
+      fetch,
+    });
+    await client.signInWithPassword("mobile@example.com", "password");
+
+    const request = client.getCurrentUser();
+    await vi.waitFor(() => {
+      expect(
+        fetch.mock.calls.some(([url]) =>
+          String(url).endsWith("/auth/api/v1/tokens/refresh"),
+        ),
+      ).toBe(true);
+    });
+    await client.signOut();
+    resolveRefresh(
+      json(200, {
+        access_token: "fresh-access",
+        refresh_token: "refresh-2",
+      }),
+    );
+
+    await expect(request).rejects.toMatchObject({ status: 401 });
+    expect(client.getSessionSnapshot()).toEqual({
+      status: "anonymous",
+      user: null,
+    });
+    expect(await storage.getRefreshToken()).toBeNull();
+  });
+
+  it("does not restore a token read from storage behind sign-out", async () => {
+    let resolveStoredToken!: (token: string | null) => void;
+    const storedToken = new Promise<string | null>((resolve) => {
+      resolveStoredToken = resolve;
+    });
+    let removed = false;
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage: {
+        async getRefreshToken() {
+          return storedToken;
+        },
+        async setRefreshToken() {},
+        async removeRefreshToken() {
+          removed = true;
+        },
+      },
+      fetch: vi.fn(async () => json(204)),
+    });
+
+    const restore = client.restore();
+    const signOut = client.signOut();
+    resolveStoredToken("refresh-1");
+
+    await expect(restore).resolves.toBe(false);
+    await expect(signOut).resolves.toBeUndefined();
+    expect(removed).toBe(true);
+    expect(client.getSessionSnapshot()).toEqual({
+      status: "anonymous",
+      user: null,
+    });
+  });
+
+  it("does not apply a login response that completes behind sign-out", async () => {
+    const storage = createMemoryTokenStorage();
+    let resolveLogin!: (response: Response) => void;
+    const loginResponse = new Promise<Response>((resolve) => {
+      resolveLogin = resolve;
+    });
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage,
+      fetch: vi.fn(async (url: string | URL | Request) => {
+        const path = new URL(String(url)).pathname;
+        if (path.endsWith("/login")) return loginResponse;
+        return json(204);
+      }),
+    });
+
+    const login = client.signInWithPassword("mobile@example.com", "password");
+    await client.signOut();
+    resolveLogin(
+      json(200, {
+        user,
+        access_token: "access-1",
+        refresh_token: "refresh-1",
+      }),
+    );
+
+    await expect(login).resolves.toMatchObject({ user });
+    expect(client.getSessionSnapshot()).toEqual({
+      status: "anonymous",
+      user: null,
+    });
+    expect(await storage.getRefreshToken()).toBeNull();
+  });
+
+  it("does not apply a retried token response that completes behind sign-out", async () => {
+    const storage = createMemoryTokenStorage();
+    let resolveRetry!: (response: Response) => void;
+    const retryResponse = new Promise<Response>((resolve) => {
+      resolveRetry = resolve;
+    });
+    let switchAttempts = 0;
+    const fetch = vi.fn(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        const path = new URL(String(url)).pathname;
+        if (path.endsWith("/login")) {
+          return json(200, {
+            user,
+            access_token: "expired-access",
+            refresh_token: "refresh-1",
+          });
+        }
+        if (path.endsWith("/tokens/refresh")) {
+          return json(200, {
+            access_token: "fresh-access",
+            refresh_token: "refresh-2",
+          });
+        }
+        if (path.endsWith("/switch")) {
+          switchAttempts += 1;
+          return switchAttempts === 1
+            ? json(401, { error: { code: "unauthorized" } })
+            : retryResponse;
+        }
+        if (path.endsWith("/tokens/revoke")) return json(204);
+        throw new Error(
+          `unexpected request: ${String(url)} ${String(init?.method)}`,
+        );
+      },
+    );
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage,
+      fetch,
+    });
+    await client.signInWithPassword("mobile@example.com", "password");
+
+    const switching = client.switchOrganization({
+      organizationID: "00000000-0000-0000-0000-000000000002",
+    });
+    await vi.waitFor(() => expect(switchAttempts).toBe(2));
+    await client.signOut();
+    resolveRetry(
+      json(200, {
+        access_token: "switched-access",
+        refresh_token: "switched-refresh",
+      }),
+    );
+
+    await expect(switching).resolves.toMatchObject({
+      access_token: "switched-access",
+    });
+    expect(client.getSessionSnapshot()).toEqual({
+      status: "anonymous",
+      user: null,
+    });
+    expect(await storage.getRefreshToken()).toBeNull();
+  });
+
+  it("does not delete a newer login queued ahead of sign-out cleanup", async () => {
+    let storedToken: string | null = null;
+    let blockWrites = false;
+    let releaseWrite!: () => void;
+    let markWriteStarted!: () => void;
+    const writeStarted = new Promise<void>((resolve) => {
+      markWriteStarted = resolve;
+    });
+    const blockedWrite = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const storage = {
+      async getRefreshToken() {
+        return storedToken;
+      },
+      async setRefreshToken(token: string) {
+        if (blockWrites) {
+          markWriteStarted();
+          await blockedWrite;
+        }
+        storedToken = token;
+      },
+      async removeRefreshToken() {
+        storedToken = null;
+      },
+    };
+    let loginCount = 0;
+    let resolveRevoke!: (response: Response) => void;
+    const revokeResponse = new Promise<Response>((resolve) => {
+      resolveRevoke = resolve;
+    });
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage,
+      fetch: vi.fn(async (url: string | URL | Request) => {
+        const path = new URL(String(url)).pathname;
+        if (path.endsWith("/login")) {
+          loginCount += 1;
+          return json(200, {
+            user,
+            access_token: `access-${loginCount}`,
+            refresh_token: `refresh-${loginCount}`,
+          });
+        }
+        if (path.endsWith("/tokens/refresh")) {
+          return json(200, {
+            access_token: "stale-refresh-access",
+            refresh_token: "stale-refresh-token",
+          });
+        }
+        if (path.endsWith("/tokens/revoke")) return revokeResponse;
+        return json(401, { error: { code: "unauthorized" } });
+      }),
+    });
+    await client.signInWithPassword("mobile@example.com", "password");
+    blockWrites = true;
+
+    const request = client.getCurrentUser();
+    await writeStarted;
+    const signOut = client.signOut();
+    const newLogin = client.signInWithPassword(
+      "mobile@example.com",
+      "password",
+    );
+    resolveRevoke(json(204));
+    await Promise.resolve();
+    releaseWrite();
+
+    await expect(request).rejects.toMatchObject({ status: 401 });
+    await expect(signOut).resolves.toBeUndefined();
+    await expect(newLogin).resolves.toMatchObject({
+      refresh_token: "refresh-2",
+    });
+    expect(storedToken).toBe("refresh-2");
+    expect(client.getSessionSnapshot()).toEqual({
+      status: "authenticated",
+      user,
+    });
+  });
+
+  it("does not revoke a newer token returned by a delayed storage read", async () => {
+    let resolveStoredToken!: (token: string | null) => void;
+    const storedToken = new Promise<string | null>((resolve) => {
+      resolveStoredToken = resolve;
+    });
+    let currentToken: string | null = null;
+    const revoked: string[] = [];
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage: {
+        async getRefreshToken() {
+          return storedToken;
+        },
+        async setRefreshToken(token) {
+          currentToken = token;
+        },
+        async removeRefreshToken() {
+          currentToken = null;
+        },
+      },
+      fetch: vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        const path = new URL(String(url)).pathname;
+        if (path.endsWith("/login")) {
+          return json(200, {
+            user,
+            access_token: "new-access",
+            refresh_token: "new-refresh",
+          });
+        }
+        if (path.endsWith("/tokens/revoke")) {
+          revoked.push(JSON.parse(String(init?.body)).refresh_token);
+          return json(204);
+        }
+        throw new Error(`unexpected request: ${String(url)}`);
+      }),
+    });
+
+    const signOut = client.signOut();
+    await client.signInWithPassword("mobile@example.com", "password");
+    resolveStoredToken("new-refresh");
+
+    await expect(signOut).resolves.toBeUndefined();
+    expect(revoked).toEqual([]);
+    expect(currentToken).toBe("new-refresh");
+    expect(client.getSessionSnapshot().status).toBe("authenticated");
+  });
+
+  it("becomes anonymous when secure storage cannot be read", async () => {
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage: {
+        async getRefreshToken() {
+          throw new Error("secure storage unavailable");
+        },
+        async setRefreshToken() {},
+        async removeRefreshToken() {},
+      },
+      fetch: vi.fn(),
+    });
+
+    await expect(client.restore()).resolves.toBe(false);
+    expect(client.getSessionSnapshot()).toEqual({
+      status: "anonymous",
+      user: null,
+    });
+  });
+
+  it("does not publish an authenticated session when storage fails", async () => {
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage: {
+        async getRefreshToken() {
+          return null;
+        },
+        async setRefreshToken() {
+          throw new Error("secure storage unavailable");
+        },
+        async removeRefreshToken() {},
+      },
+      fetch: vi.fn(async () =>
+        json(200, {
+          user,
+          access_token: "access-1",
+          refresh_token: "refresh-1",
+        }),
+      ),
+    });
+
+    await expect(
+      client.signInWithPassword("mobile@example.com", "password"),
+    ).rejects.toThrow("secure storage unavailable");
+    expect(client.getSessionSnapshot()).toEqual({
+      status: "anonymous",
+      user: null,
+    });
+  });
+
+  it("stays locally anonymous when stored-token deletion fails", async () => {
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage: {
+        async getRefreshToken() {
+          return "refresh-1";
+        },
+        async setRefreshToken() {},
+        async removeRefreshToken() {
+          throw new Error("secure storage unavailable");
+        },
+      },
+      fetch: vi.fn(async () => json(204)),
+    });
+
+    await expect(client.signOut()).rejects.toThrow(
+      "secure storage unavailable",
+    );
+    expect(client.getSessionSnapshot()).toEqual({
+      status: "anonymous",
+      user: null,
+    });
   });
 
   it("runs login, link, reauthentication, and recovery through a native provider", async () => {

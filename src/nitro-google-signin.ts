@@ -3,6 +3,7 @@ import {
   isCancelledResponse,
   isSuccessResponse,
 } from "react-native-nitro-google-signin";
+import { Platform } from "react-native";
 
 import type { GoogleNativeAdapter } from "./native-client.js";
 
@@ -15,7 +16,7 @@ export function createNitroGoogleSignIn(
 ): GoogleNativeAdapter {
   return {
     async authorize(options) {
-      if (!config.iosClientId) {
+      if (Platform.OS === "ios" && !config.iosClientId) {
         throw new Error(
           "Google native sign-in needs AUTHARA_OAUTH_GOOGLE_IOS_CLIENT_ID in the React Native .env",
         );
