@@ -207,6 +207,7 @@ describe("AutharaNativeClient", () => {
     expect(mutations[2]?.body).toEqual({
       credential: "google-id-token",
       nonce: "nonce-1",
+      challenge_id: "challenge-1",
       authentication_challenge_id: "recent-1",
     });
     expect(mutations[3]?.body).toEqual({
@@ -272,6 +273,10 @@ describe("AutharaNativeClient", () => {
       audience: "app",
       recoveryLinkId: "microsoft-link",
     });
+    await client.runNativeProviderAction("microsoft", {
+      action: "reauthenticate",
+      authenticationChallengeId: "recent-microsoft",
+    });
 
     expect(bodies["/auth/api/v1/oauth/apple"]).toEqual({
       code: "apple-code",
@@ -307,6 +312,12 @@ describe("AutharaNativeClient", () => {
       credential: "microsoft-token",
       nonce: "microsoft-nonce",
       challenge_id: "microsoft-challenge",
+    });
+    expect(bodies["/auth/api/v1/reauthenticate/microsoft"]).toEqual({
+      credential: "microsoft-token",
+      nonce: "microsoft-nonce",
+      challenge_id: "microsoft-challenge",
+      authentication_challenge_id: "recent-microsoft",
     });
   });
 });
