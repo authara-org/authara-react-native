@@ -47,6 +47,9 @@ through `AutharaTokenStorage`. On startup, `AutharaProvider` restores the
 session by rotating that token. Concurrent 401 responses share one refresh,
 then each request retries once with `Authorization: Bearer …`.
 
+`baseUrl` must use HTTPS. Local development can explicitly opt in to HTTP with
+`allowInsecureHttp: true`; never enable it in production.
+
 ## Native provider adapters
 
 Authara accepts small adapters so applications can control their native setup,

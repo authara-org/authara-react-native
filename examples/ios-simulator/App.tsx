@@ -33,6 +33,7 @@ const baseUrl =
 
 const authara = createAuthara({
   baseUrl,
+  allowInsecureHttp: __DEV__,
   providers: nativeProviders,
   storage: createExpoSecureStore({ key: "authara-local-refresh-token" }),
 });

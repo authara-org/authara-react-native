@@ -111,6 +111,18 @@ export function AccountScreen() {
     }
   };
 
+  const signOutCurrentDevice = async () => {
+    setAction("sign-out");
+    setError(undefined);
+    try {
+      await signOut();
+    } catch (caught) {
+      setError(messageFor(caught));
+    } finally {
+      setAction(undefined);
+    }
+  };
+
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -253,7 +265,7 @@ export function AccountScreen() {
             label="Sign out"
             danger
             disabled={action !== undefined}
-            onPress={() => void signOut()}
+            onPress={() => void signOutCurrentDevice()}
           />
         </View>
       </ScreenReveal>

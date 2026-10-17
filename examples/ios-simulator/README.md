@@ -28,6 +28,14 @@ Fill `.env` with the playground URL, Cloudflare tunnel token, provider server
 configuration, and public native client IDs. The file is ignored by Git and is
 the only playground environment file read by this repository.
 
+Generate independent signing and challenge keys, keeping the IDs from
+`.env.example`:
+
+```bash
+openssl rand -base64 32 # AUTHARA_JWT_PRIVATE_KEYS=playground:<output>
+openssl rand -base64 32 # AUTHARA_CHALLENGE_VERIFICATION_CODE_KEYS=playground-challenge:<output>
+```
+
 From the React Native SDK root, run:
 
 ```bash
