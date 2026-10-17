@@ -3414,6 +3414,9 @@ components:
         authentication_challenge_id:
           type: string
           format: uuid
+        challenge_id:
+          type: string
+          format: uuid
         credential:
           type: string
           description: Legacy Google ID token. Must be provided together with nonce when code is omitted.
@@ -3448,6 +3451,9 @@ components:
       required: [authentication_challenge_id, credential, nonce]
       properties:
         authentication_challenge_id:
+          type: string
+          format: uuid
+        challenge_id:
           type: string
           format: uuid
         credential:
