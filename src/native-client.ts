@@ -151,6 +151,7 @@ export class AutharaNativeClient extends GeneratedAutharaApiClient {
           body: {
             credential: proof.credential,
             nonce: options.nonce,
+            challenge_id: options.challenge_id,
             authentication_challenge_id: action.authenticationChallengeId,
           },
         });
@@ -252,6 +253,7 @@ export class AutharaNativeClient extends GeneratedAutharaApiClient {
           body: {
             credential: proof.credential,
             nonce: options.nonce,
+            challenge_id: options.challenge_id,
             authentication_challenge_id: action.authenticationChallengeId,
           },
         });
