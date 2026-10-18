@@ -53,6 +53,11 @@ if test -n "$core_dir_input"; then
     echo "Authara Core was not found at $core_dir." >&2
     exit 1
   fi
+  if ! test -f "$local_compose_file"; then
+    echo "The local Compose override was not found at $local_compose_file." >&2
+    echo "Copy $sdk_dir/docker-compose.playground.local.example.yaml to $local_compose_file." >&2
+    exit 1
+  fi
   export AUTHARA_EXAMPLE_CORE_DIR="$core_dir"
   compose+=( -f "$local_compose_file" )
 fi

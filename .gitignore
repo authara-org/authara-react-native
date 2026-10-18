@@ -6,3 +6,4 @@ coverage/
 .expo/
 ios/
 android/
+docker-compose.playground.local.yaml

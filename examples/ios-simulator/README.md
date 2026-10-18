@@ -65,6 +65,7 @@ its migrations locally; no Core `.env` is read. You can also override it for a
 single run:
 
 ```bash
+cp docker-compose.playground.local.example.yaml docker-compose.playground.local.yaml
 AUTHARA_EXAMPLE_CORE_DIR=/absolute/path/to/authara-core npm run example:ios
 ```
 
