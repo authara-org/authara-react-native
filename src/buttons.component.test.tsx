@@ -235,22 +235,28 @@ describe("native provider button interactions", () => {
     expect(alert.props.children).toBe("Provider unavailable");
   });
 
-  it("routes Microsoft cancellation separately from errors", async () => {
-    const onCancel = vi.fn();
-    const onError = vi.fn();
-    testState.client.runNativeProviderAction.mockRejectedValue(
-      new AutharaProviderCancellationError("Microsoft"),
-    );
-    const root = await render(
-      <MicrosoftButton onCancel={onCancel} onError={onError} />,
-    );
+  it.each([
+    ["Google", GoogleButton],
+    ["Microsoft", MicrosoftButton],
+  ] as const)(
+    "routes %s cancellation separately from errors",
+    async (provider, Button) => {
+      const onCancel = vi.fn();
+      const onError = vi.fn();
+      testState.client.runNativeProviderAction.mockRejectedValue(
+        new AutharaProviderCancellationError(provider),
+      );
+      const root = await render(
+        <Button onCancel={onCancel} onError={onError} />,
+      );
 
-    await act(async () => press(root));
+      await act(async () => press(root));
 
-    expect(onCancel).toHaveBeenCalledOnce();
-    expect(onError).not.toHaveBeenCalled();
-    expect(byProps(root, { accessibilityRole: "alert" })).toHaveLength(0);
-  });
+      expect(onCancel).toHaveBeenCalledOnce();
+      expect(onError).not.toHaveBeenCalled();
+      expect(byProps(root, { accessibilityRole: "alert" })).toHaveLength(0);
+    },
+  );
 
   it("renders the consumer fallback and announces unavailable adapters once", async () => {
     const onUnavailable = vi.fn();

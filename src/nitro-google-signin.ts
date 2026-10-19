@@ -5,6 +5,7 @@ import {
 } from "react-native-nitro-google-signin";
 import { Platform } from "react-native";
 
+import { AutharaProviderCancellationError } from "./button-error.js";
 import type { GoogleNativeAdapter } from "./native-client.js";
 
 export interface NitroGoogleSignInOptions {
@@ -32,7 +33,7 @@ export function createNitroGoogleSignIn(
       const response = await GoogleOneTapSignIn.presentExplicitSignIn();
 
       if (isCancelledResponse(response)) {
-        throw new Error("Google sign-in was cancelled");
+        throw new AutharaProviderCancellationError("Google");
       }
       if (!isSuccessResponse(response) || !response.data.idToken) {
         throw new Error("Google did not return an ID token");
