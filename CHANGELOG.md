@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/authara-org/authara-react-native/compare/v0.1.1...v0.2.0) (2026-10-19)
+
+
+### Features
+
+* **auth:** expose access token bridge ([#13](https://github.com/authara-org/authara-react-native/issues/13)) ([074ee0f](https://github.com/authara-org/authara-react-native/commit/074ee0f6d657bebec59ddf275c4341829d9d68d9))
+
 ## [0.1.1](https://github.com/authara-org/authara-react-native/compare/v0.1.0...v0.1.1) (2026-10-17)
 
 
