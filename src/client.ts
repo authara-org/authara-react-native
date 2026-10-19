@@ -76,6 +76,8 @@ export class AutharaClient {
 
   getSessionSnapshot = (): AutharaSessionSnapshot => this.snapshot;
 
+  getAccessToken = (): string | null => this.accessToken;
+
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -129,6 +131,10 @@ export class AutharaClient {
     } finally {
       await this.removeStoredRefreshToken(generation);
     }
+  }
+
+  async refreshAccessToken(): Promise<string | null> {
+    return (await this.refresh()) ? this.accessToken : null;
   }
 
   protected async request<T>(
