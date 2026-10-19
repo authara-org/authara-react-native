@@ -50,6 +50,20 @@ then each request retries once with `Authorization: Bearer …`.
 `baseUrl` must use HTTPS. Local development can explicitly opt in to HTTP with
 `allowInsecureHttp: true`; never enable it in production.
 
+The package publishes ESM. Jest consumers must allow Babel to transform the
+package, for example with `jest-expo`:
+
+```js
+module.exports = {
+  preset: "jest-expo",
+  transformIgnorePatterns: [
+    "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|@authara/react-native))",
+    "/node_modules/react-native-reanimated/plugin/",
+    "/node_modules/@react-native/babel-preset/",
+  ],
+};
+```
+
 ### Application API clients
 
 An application with its own authenticated API can read the current in-memory

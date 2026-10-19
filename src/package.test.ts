@@ -10,4 +10,14 @@ describe("package peer contract", () => {
       "expo-secure-store": ">=14 <16 || >=56 <58",
     });
   });
+
+  it("exposes every public entry point to import and default resolvers", () => {
+    for (const entry of Object.values(packageJSON.exports)) {
+      expect(entry).toMatchObject({
+        import: expect.stringMatching(/^\.\/dist\/.*\.js$/),
+        types: expect.stringMatching(/^\.\/dist\/.*\.d\.ts$/),
+        default: expect.stringMatching(/^\.\/dist\/.*\.js$/),
+      });
+    }
+  });
 });
