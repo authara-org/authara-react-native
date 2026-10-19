@@ -6,13 +6,14 @@ const nitro = vi.hoisted(() => ({
   presentExplicitSignIn: vi.fn(async () => ({
     data: { idToken: "google-id-token" },
   })),
+  cancelled: false,
 }));
 
 vi.mock("react-native", () => ({ Platform: { OS: "android" } }));
 vi.mock("react-native-nitro-google-signin", () => ({
   GoogleOneTapSignIn: nitro,
-  isCancelledResponse: () => false,
-  isSuccessResponse: () => true,
+  isCancelledResponse: () => nitro.cancelled,
+  isSuccessResponse: () => !nitro.cancelled,
 }));
 
 import { Platform } from "react-native";
@@ -22,6 +23,7 @@ import { createNitroGoogleSignIn } from "./nitro-google-signin.js";
 describe("createNitroGoogleSignIn", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    nitro.cancelled = false;
     Object.defineProperty(Platform, "OS", {
       configurable: true,
       value: "android",
@@ -60,5 +62,17 @@ describe("createNitroGoogleSignIn", () => {
       }),
     ).rejects.toThrow("AUTHARA_OAUTH_GOOGLE_IOS_CLIENT_ID");
     expect(nitro.configure).not.toHaveBeenCalled();
+  });
+
+  it("reports native cancellation through the shared cancellation contract", async () => {
+    nitro.cancelled = true;
+
+    await expect(
+      createNitroGoogleSignIn().authorize({
+        client_id: "google-web-client",
+        nonce: "nonce",
+        challenge_id: "challenge",
+      }),
+    ).rejects.toMatchObject({ name: "AutharaProviderCancellationError" });
   });
 });

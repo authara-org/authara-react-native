@@ -71,6 +71,7 @@ export interface GoogleButtonVisualProps extends AutharaButtonVisualProps {
   border?: boolean;
   shape?: "pill" | "circle" | "square" | "rectangular";
   logoAlignment?: "left" | "center";
+  onCancel?: () => void;
 }
 
 export interface AppleButtonVisualProps extends AutharaButtonVisualProps {
@@ -324,6 +325,7 @@ export function GoogleButton(props: GoogleButtonProps) {
     recoveryLinkId,
     onSuccess,
     onError,
+    onCancel,
     variant = "text",
     size = "large",
     label = action === "login" ? "sign-in" : "continue",
@@ -354,6 +356,7 @@ export function GoogleButton(props: GoogleButtonProps) {
       recoveryLinkId={recoveryLinkId}
       onSuccess={onSuccess}
       onError={onError}
+      onCancel={onCancel}
       variant={variant}
       label={visibleLabel}
       appearance={googleButtonAppearance({
