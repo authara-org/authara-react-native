@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/authara-org/authara-react-native/compare/v0.2.0...v0.2.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* **auth:** normalize Google cancellation ([#16](https://github.com/authara-org/authara-react-native/issues/16)) ([c5a0b9a](https://github.com/authara-org/authara-react-native/commit/c5a0b9a465b34ce22fed80d51b2394b8985dfd50))
+* **expo:** allow synchronized adapter majors ([#19](https://github.com/authara-org/authara-react-native/issues/19)) ([7ca2db1](https://github.com/authara-org/authara-react-native/commit/7ca2db19f06ebdf2b15907ea601d22800527d680))
+
 ## [0.2.0](https://github.com/authara-org/authara-react-native/compare/v0.1.1...v0.2.0) (2026-10-19)
 
 
