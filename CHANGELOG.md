@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/authara-org/authara-react-native/compare/v0.2.1...v0.2.2) (2026-10-19)
+
+
+### Bug Fixes
+
+* expose SDK to Expo Jest resolvers ([#21](https://github.com/authara-org/authara-react-native/issues/21)) ([3694e4e](https://github.com/authara-org/authara-react-native/commit/3694e4e74868addab4331e45630128b41514871f))
+
 ## [0.2.1](https://github.com/authara-org/authara-react-native/compare/v0.2.0...v0.2.1) (2026-10-19)
 
 
