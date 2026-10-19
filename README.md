@@ -50,6 +50,26 @@ then each request retries once with `Authorization: Bearer …`.
 `baseUrl` must use HTTPS. Local development can explicitly opt in to HTTP with
 `allowInsecureHttp: true`; never enable it in production.
 
+### Application API clients
+
+An application with its own authenticated API can read the current in-memory
+access token without taking ownership of Authara's token lifecycle. Subscribe
+to session changes to synchronize the application's transport, and ask Authara
+to rotate the token after that API returns 401:
+
+```ts
+const unsubscribe = authara.subscribe(() => {
+  appApi.setAccessToken(authara.getAccessToken());
+});
+
+appApi.setRefreshHandler(() => authara.refreshAccessToken());
+```
+
+`refreshAccessToken()` shares concurrent rotation work and returns the current
+access token or `null`. Refresh tokens remain private and persisted only through
+the configured `AutharaTokenStorage`. Unsubscribe when the application bridge
+is disposed.
+
 ## Native provider adapters
 
 Authara accepts small adapters so applications can control their native setup,

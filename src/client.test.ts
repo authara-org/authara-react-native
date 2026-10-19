@@ -65,6 +65,7 @@ describe("AutharaNativeClient", () => {
     });
 
     await client.signInWithPassword("mobile@example.com", "password");
+    expect(client.getAccessToken()).toBe("access-1");
     await client.getCurrentUser();
 
     expect(await storage.getRefreshToken()).toBe("refresh-1");
@@ -116,6 +117,50 @@ describe("AutharaNativeClient", () => {
     expect(await storage.getRefreshToken()).toBe("refresh-2");
   });
 
+  it("lets an application API client share the SDK-owned token lifecycle", async () => {
+    const storage = createMemoryTokenStorage();
+    let refreshes = 0;
+    const client = createAuthara({
+      baseUrl: "https://auth.example.com",
+      storage,
+      fetch: vi.fn(async (url: string | URL | Request) => {
+        const path = new URL(String(url)).pathname;
+        if (path.endsWith("/login")) {
+          return json(200, {
+            user,
+            access_token: "access-1",
+            refresh_token: "refresh-1",
+          });
+        }
+        if (path.endsWith("/tokens/refresh")) {
+          refreshes += 1;
+          await Promise.resolve();
+          return json(200, {
+            access_token: "access-2",
+            refresh_token: "refresh-2",
+          });
+        }
+        if (path.endsWith("/tokens/revoke")) return json(204);
+        throw new Error(`unexpected request: ${String(url)}`);
+      }),
+    });
+    const snapshots: Array<string | null> = [];
+    const unsubscribe = client.subscribe(() => {
+      snapshots.push(client.getAccessToken());
+    });
+
+    await client.signInWithPassword("mobile@example.com", "password");
+    await expect(
+      Promise.all([client.refreshAccessToken(), client.refreshAccessToken()]),
+    ).resolves.toEqual(["access-2", "access-2"]);
+    await client.signOut();
+    unsubscribe();
+
+    expect(refreshes).toBe(1);
+    expect(snapshots).toEqual(["access-1", "access-1", "access-2", null]);
+    expect(client.getAccessToken()).toBeNull();
+  });
+
   it("revokes remotely and always clears the local refresh token", async () => {
     const storage = createMemoryTokenStorage();
     await storage.setRefreshToken("refresh-1");
@@ -131,6 +176,7 @@ describe("AutharaNativeClient", () => {
     await expect(client.signOut()).resolves.toBeUndefined();
 
     expect(await storage.getRefreshToken()).toBeNull();
+    expect(client.getAccessToken()).toBeNull();
     expect(client.getSessionSnapshot().status).toBe("anonymous");
   });
 
