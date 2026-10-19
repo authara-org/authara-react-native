@@ -29,23 +29,28 @@
   "exports": {
     ".": {
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./expo-secure-store": {
       "import": "./dist/expo-secure-store.js",
-      "types": "./dist/expo-secure-store.d.ts"
+      "types": "./dist/expo-secure-store.d.ts",
+      "default": "./dist/expo-secure-store.js"
     },
     "./expo-apple-authentication": {
       "import": "./dist/expo-apple-authentication.js",
-      "types": "./dist/expo-apple-authentication.d.ts"
+      "types": "./dist/expo-apple-authentication.d.ts",
+      "default": "./dist/expo-apple-authentication.js"
     },
     "./nitro-google-signin": {
       "import": "./dist/nitro-google-signin.js",
-      "types": "./dist/nitro-google-signin.d.ts"
+      "types": "./dist/nitro-google-signin.d.ts",
+      "default": "./dist/nitro-google-signin.js"
     },
     "./expo-microsoft-auth-session": {
       "import": "./dist/expo-microsoft-auth-session.js",
-      "types": "./dist/expo-microsoft-auth-session.d.ts"
+      "types": "./dist/expo-microsoft-auth-session.d.ts",
+      "default": "./dist/expo-microsoft-auth-session.js"
     }
   },
   "files": [
