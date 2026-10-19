@@ -3,6 +3,8 @@
   "compilerOptions": {
     "declaration": false,
     "noEmit": true,
+    "resolveJsonModule": true,
+    "rootDir": ".",
     "types": ["vitest/globals"]
   },
   "include": ["src/**/*.test.ts", "src/**/*.test.tsx"],
