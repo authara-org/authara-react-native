@@ -1,6 +1,6 @@
 {
   "name": "@authara/react-native",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Official React Native client, hooks, and native-provider buttons for Authara",
   "keywords": [
     "authentication",
