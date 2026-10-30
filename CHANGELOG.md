@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/authara-org/authara-react-native/compare/v0.2.2...v0.3.0) (2026-10-30)
+
+
+### Features
+
+* **api:** generate client from authara-core v0.30.0 ([#23](https://github.com/authara-org/authara-react-native/issues/23)) ([613d6a0](https://github.com/authara-org/authara-react-native/commit/613d6a0f42e3fd2185edf52a4401404c675f6441))
+
 ## [0.2.2](https://github.com/authara-org/authara-react-native/compare/v0.2.1...v0.2.2) (2026-10-19)
 
 
