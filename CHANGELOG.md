@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/authara-org/authara-react-native/compare/v0.3.1...v0.3.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **test:** classify orgless organization creation ([#32](https://github.com/authara-org/authara-react-native/issues/32)) ([6b3e8a6](https://github.com/authara-org/authara-react-native/commit/6b3e8a6b2a0bb74f7a51567f3b58da8f99425cb7))
+
 ## [0.3.1](https://github.com/authara-org/authara-react-native/compare/v0.3.0...v0.3.1) (2026-11-20)
 
 
