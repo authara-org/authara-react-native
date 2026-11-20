@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/authara-org/authara-react-native/compare/v0.3.0...v0.3.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **test:** update auth session fixture ([#28](https://github.com/authara-org/authara-react-native/issues/28)) ([845ef60](https://github.com/authara-org/authara-react-native/commit/845ef60d0bd8b18fc92a5b3edf9935ac93a6df6d))
+
 ## [0.3.0](https://github.com/authara-org/authara-react-native/compare/v0.2.2...v0.3.0) (2026-10-30)
 
 
