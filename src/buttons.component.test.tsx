@@ -73,6 +73,11 @@ const roots: Root[] = [];
 const session = {
   access_token: "access-token",
   refresh_token: "refresh-token",
+  organization_state: {
+    status: "active" as const,
+    can_accept_invitation: false,
+    can_create_organization: false,
+  },
   user: {
     id: "00000000-0000-0000-0000-000000000001",
     email: "user@example.com",
