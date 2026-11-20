@@ -18,6 +18,7 @@ const productUI = [
   "acceptInvitation",
   "loginAndAcceptInvitation",
   "previewInvitation",
+  "createOrganizationForCurrentUser",
   "listCurrentUserOrganizations",
   "getCurrentOrganization",
   "listCurrentOrganizationMembers",
