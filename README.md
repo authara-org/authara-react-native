@@ -64,6 +64,11 @@ module.exports = {
 };
 ```
 
+Published packages carry the immutable Authara Core contract provenance used
+to generate their public API. Internal-only Core contract additions do not
+change the React Native API, but are still published in the next patch release
+so applications can verify a complete compatibility set.
+
 ### Application API clients
 
 An application with its own authenticated API can read the current in-memory
