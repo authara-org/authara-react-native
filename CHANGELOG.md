@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/authara-org/authara-react-native/compare/v0.3.2...v0.3.3) (2026-11-21)
+
+
+### Bug Fixes
+
+* **release:** publish Core v0.36 provenance ([#35](https://github.com/authara-org/authara-react-native/issues/35)) ([26184ab](https://github.com/authara-org/authara-react-native/commit/26184abf9386f7bcbdd34e7fc825b7c02b4d86e9))
+
 ## [0.3.2](https://github.com/authara-org/authara-react-native/compare/v0.3.1...v0.3.2) (2026-11-20)
 
 
